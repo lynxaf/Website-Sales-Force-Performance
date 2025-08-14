@@ -1,0 +1,11 @@
+{
+    "name": "website-sales-force-performance",
+    "private": true,
+    "workspaces": [
+        "frontend",
+        "backend"
+    ],
+    "devDependencies": {
+        "concurrently": "^9.2.0"
+    }
+}
