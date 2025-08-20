@@ -1,4 +1,3 @@
-
 const { SalesPerformance } = require('../models');
 const { Op } = require('sequelize');
 const { parseSalesData } = require('../services/excelParser');
@@ -16,6 +15,10 @@ const uploadSalesData = async (req, res) => {
     const filePath = req.file.path;
     const salesData = parseSalesData(filePath);
     
+    // Hapus data lama sebelum mengunggah yang baru
+    await SalesPerformance.destroy({ truncate: true, cascade: true });
+    
+    // Ambil semua newOrderId yang sudah ada di database
     const existingOrders = await SalesPerformance.findAll({
       attributes: ['newOrderId'],
       raw: true,
@@ -23,6 +26,7 @@ const uploadSalesData = async (req, res) => {
     });
     const existingOrderIds = new Set(existingOrders.map(o => o.newOrderId));
 
+    // Filter data baru untuk menghindari duplikasi
     const uniqueSalesData = salesData.filter(d => !existingOrderIds.has(d.newOrderId));
 
     if (uniqueSalesData.length > 0) {
@@ -62,6 +66,9 @@ const getMetrics = async (req, res) => {
     }, {});
 
     const metricsPerSales = Object.entries(salesDataByCode).map(([kodeSF, data]) => {
+      // Perbaikan: Pastikan tanggal diurutkan
+      data.sort((a, b) => new Date(a.tanggalPS) - new Date(b.tanggalPS));
+
       return {
         kodeSF: kodeSF,
         WoW: getWeeklyChange(data),
