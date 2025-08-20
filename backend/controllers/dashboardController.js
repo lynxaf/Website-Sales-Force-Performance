@@ -81,6 +81,85 @@ try {
   }
 }
 
+// const uploadSalesData = async (req, res) => {
+//   console.log('=== UPLOAD SALES DATA CALLED ===');
+
+//   try {
+//     console.log('Request file:', req.file);
+
+//     if (!req.file) {
+//       console.log('❌ No file found in request');
+//       return res.status(400).json({
+//         success: false,
+//         msg: "File Excel tidak ditemukan"
+//       });
+//     }
+
+//     const filePath = req.file.path;
+//     console.log('Processing file:', filePath);
+
+//     // Check if file exists
+//     if (!fs.existsSync(filePath)) {
+//       console.log('❌ File not found on disk:', filePath);
+//       return res.status(500).json({
+//         success: false,
+//         msg: "File tidak ditemukan di server"
+//       });
+//     }
+
+//     console.log('📊 Parsing sales data...');
+//     const salesData = parseSalesData(filePath);
+
+//     const existingOrders = await SalesPerformance.findAll({
+//       attributes: ['newOrderId'],
+//       raw: true,
+//       paranoid: false
+//     });
+//     const existingOrderIds = new Set(existingOrders.map(o => o.newOrderId));
+
+//     const uniqueSalesData = salesData.filter(d => !existingOrderIds.has(d.newOrderId));
+
+//     if (uniqueSalesData.length > 0) {
+//       console.log('💾 Inserting data into database...');
+//       await SalesPerformance.bulkCreate(uniqueSalesData);
+//       console.log('✅ Data inserted successfully');
+//     }
+
+//     // Clean up file
+//     console.log('🧹 Cleaning up uploaded file...');
+//     fs.unlinkSync(filePath);
+
+//     res.status(200).json({
+//       success: true,
+//       msg: `Berhasil mengunggah ${uniqueSalesData.length} data baru.`,
+//       totalSkipped: salesData.length - uniqueSalesData.length,
+//       data: {
+//         totalRecords: salesData.length,
+//         newRecords: uniqueSalesData.length,
+//         skippedRecords: salesData.length - uniqueSalesData.length
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error('❌ Error in uploadSalesData:', error);
+
+//     // Clean up file if it exists
+//     if (req.file && fs.existsSync(req.file.path)) {
+//       try {
+//         fs.unlinkSync(req.file.path);
+//         console.log('🧹 Cleaned up file after error');
+//       } catch (cleanupError) {
+//         console.warn('Could not clean up file:', cleanupError.message);
+//       }
+//     }
+//     res.status(500).json({
+//       success: false,
+//       error: error.message,
+//       msg: "Terjadi kesalahan saat memproses file"
+//     });
+//   }
+// };
+
 const uploadSalesData = async (req, res) => {
   console.log('=== UPLOAD SALES DATA CALLED ===');
 
@@ -110,19 +189,52 @@ const uploadSalesData = async (req, res) => {
     console.log('📊 Parsing sales data...');
     const salesData = parseSalesData(filePath);
 
+    // Ambil semua order ID yang sudah ada di DB
     const existingOrders = await SalesPerformance.findAll({
       attributes: ['newOrderId'],
       raw: true,
       paranoid: false
     });
-    const existingOrderIds = new Set(existingOrders.map(o => o.newOrderId));
+    const existingOrderIds = new Set(existingOrders.map(o => String(o.newOrderId)));
 
-    const uniqueSalesData = salesData.filter(d => !existingOrderIds.has(d.newOrderId));
+    // Buat set untuk filter duplicate dalam file upload itu sendiri
+    const seenInUpload = new Set();
+
+    // Filter data
+    const uniqueSalesData = salesData.filter(d => {
+      const orderId = String(d.newOrderId || '').trim();
+
+      if (!orderId) {
+        console.log(`⚠️ Skip record karena newOrderId kosong:`, d);
+        return false;
+      }
+
+      if (existingOrderIds.has(orderId)) {
+        console.log(`⚠️ Skip record karena sudah ada di DB: ${orderId}`);
+        return false;
+      }
+
+      if (seenInUpload.has(orderId)) {
+        console.log(`⚠️ Skip record karena duplikat di file upload: ${orderId}`);
+        return false;
+      }
+
+      seenInUpload.add(orderId);
+      return true;
+    });
 
     if (uniqueSalesData.length > 0) {
-      console.log('💾 Inserting data into database...');
-      await SalesPerformance.bulkCreate(uniqueSalesData);
-      console.log('✅ Data inserted successfully');
+      console.log(`💾 Inserting ${uniqueSalesData.length} unique records into database...`);
+      try {
+        await SalesPerformance.bulkCreate(uniqueSalesData);
+        console.log('✅ Data inserted successfully');
+      } catch (bulkErr) {
+        console.error("❌ BulkCreate error:", bulkErr.errors?.map(e => e.message));
+        console.error("❌ Failed data sample:", uniqueSalesData[0]);
+        throw bulkErr;
+      }
+    } else {
+      console.log("ℹ️ Tidak ada data baru untuk di-insert.");
     }
 
     // Clean up file
@@ -261,6 +373,7 @@ const getMetrics = async (req, res) => {
       data.sort((a, b) => new Date(a.tanggalPS) - new Date(b.tanggalPS));
 
       return {
+        namaSF: data[0].namaSF,
         kodeSF: kodeSF,
         WoW: getWeeklyChange(data),
         MoM: getMonthlyChange(data),

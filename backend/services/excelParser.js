@@ -91,7 +91,7 @@ const parseSalesData = (filePath) => {
       area: row[headers.indexOf('Area')],
       regional: row[headers.indexOf('Regional')],
       branch: row[headers.indexOf('Branch')],
-      wok: row[headers.indexOf('Wilayah Operational Kerja')],
+      wok: row[headers.indexOf('Wilayah Operasional Kerja')],
       newOrderId: row[headers.indexOf('New Order ID')],
       tanggalPS: new Date(row[headers.indexOf('Tanggal PS')]),
     };
