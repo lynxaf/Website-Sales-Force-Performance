@@ -1,11 +1,7 @@
-
-const { SalesPerformance } = require('../models');
 const { Op } = require('sequelize');
-const { parseSalesData } = require('../services/excelParser');
 const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
-const { Op } = require('sequelize');
 
 console.log('Loading dashboard controller...');
 
@@ -113,61 +109,36 @@ const uploadSalesData = async (req, res) => {
 
     console.log('📊 Parsing sales data...');
     const salesData = parseSalesData(filePath);
-    console.log(`Parsed ${salesData.length} records from Excel`);
 
-    if (!salesData || salesData.length === 0) {
-      console.log('❌ No data found in file');
-      fs.unlinkSync(filePath); // Clean up
-      return res.status(400).json({
-        success: false,
-        msg: "Tidak ada data yang valid ditemukan dalam file"
-      });
+    const existingOrders = await SalesPerformance.findAll({
+      attributes: ['newOrderId'],
+      raw: true,
+      paranoid: false
+    });
+    const existingOrderIds = new Set(existingOrders.map(o => o.newOrderId));
+
+    const uniqueSalesData = salesData.filter(d => !existingOrderIds.has(d.newOrderId));
+
+    if (uniqueSalesData.length > 0) {
+      console.log('💾 Inserting data into database...');
+      await SalesPerformance.bulkCreate(uniqueSalesData);
+      console.log('✅ Data inserted successfully');
     }
 
-    console.log('Sample parsed data:', salesData[0]);
+    // Clean up file
+    console.log('🧹 Cleaning up uploaded file...');
+    fs.unlinkSync(filePath);
 
-    try {
-      console.log('🔍 Checking for existing orders...');
-
-      // Check for existing orders
-      const existingOrders = await SalesPerformance.findAll({
-        attributes: ['newOrderId'],
-        raw: true,
-        paranoid: false
-      });
-
-      const existingOrderIds = new Set(existingOrders.map(o => o.newOrderId));
-      console.log(`Found ${existingOrderIds.size} existing order IDs`);
-
-      // Filter out duplicates
-      const uniqueSalesData = salesData.filter(d => !existingOrderIds.has(d.newOrderId));
-      console.log(`${uniqueSalesData.length} unique records to insert`);
-
-      if (uniqueSalesData.length > 0) {
-        console.log('💾 Inserting data into database...');
-        await SalesPerformance.bulkCreate(uniqueSalesData);
-        console.log('✅ Data inserted successfully');
+    res.status(200).json({
+      success: true,
+      msg: `Berhasil mengunggah ${uniqueSalesData.length} data baru.`,
+      totalSkipped: salesData.length - uniqueSalesData.length,
+      data: {
+        totalRecords: salesData.length,
+        newRecords: uniqueSalesData.length,
+        skippedRecords: salesData.length - uniqueSalesData.length
       }
-
-      // Clean up file
-      console.log('🧹 Cleaning up uploaded file...');
-      fs.unlinkSync(filePath);
-
-      res.status(200).json({
-        success: true,
-        msg: `Berhasil mengunggah ${uniqueSalesData.length} data baru.`,
-        totalSkipped: salesData.length - uniqueSalesData.length,
-        data: {
-          totalRecords: salesData.length,
-          newRecords: uniqueSalesData.length,
-          skippedRecords: salesData.length - uniqueSalesData.length
-        }
-      });
-
-    } catch (dbError) {
-      console.error('❌ Database error:', dbError);
-      throw dbError;
-    }
+    });
 
   } catch (error) {
     console.error('❌ Error in uploadSalesData:', error);
@@ -181,7 +152,6 @@ const uploadSalesData = async (req, res) => {
         console.warn('Could not clean up file:', cleanupError.message);
       }
     }
-
     res.status(500).json({
       success: false,
       error: error.message,
@@ -288,6 +258,8 @@ const getMetrics = async (req, res) => {
     }, {});
 
     const metricsPerSales = Object.entries(salesDataByCode).map(([kodeSF, data]) => {
+      data.sort((a, b) => new Date(a.tanggalPS) - new Date(b.tanggalPS));
+
       return {
         kodeSF: kodeSF,
         WoW: getWeeklyChange(data),
@@ -315,7 +287,9 @@ const getOverallPerformance = async (req, res) => {
   console.log('getOverallPerformance called');
   try {
     const psData = await SalesPerformance.findAll({
-      attributes: ['kodeSF', 'namaSF',
+      attributes: [
+        'kodeSF',
+        'namaSF',
         [sequelize.fn('COUNT', sequelize.col('kodeSF')), 'totalPs']
       ],
       group: ['kodeSF', 'namaSF']
@@ -349,8 +323,4 @@ const getOverallPerformance = async (req, res) => {
 
 console.log('✅ Dashboard controller loaded successfully');
 
-module.exports = {
-  uploadSalesData,
-  getOverallPerformance,
-  getMetrics
-};
+module.exports = { uploadSalesData, getOverallPerformance, getMetrics };
