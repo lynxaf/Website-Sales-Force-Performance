@@ -5,36 +5,188 @@ const { parseSalesData } = require('../services/excelParser');
 const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
-const sequelize = require('../config/database');
+const { Op } = require('sequelize');
+
+console.log('Loading dashboard controller...');
+
+// Try to import your existing models/services with fallbacks
+let SalesPerformance, sequelize, parseSalesData;
+
+try {
+  // Try your existing structure first
+  const models = require('../models');
+  SalesPerformance = models.SalesPerformance;
+  console.log('✅ SalesPerformance model loaded from ../models');
+} catch (error) {
+  console.warn('⚠️ Could not load SalesPerformance from ../models:', error.message);
+}
+
+try {
+  sequelize = require('../config/database');
+  console.log('✅ Sequelize loaded from ../config/database');
+} catch (error) {
+  console.warn('⚠️ Could not load sequelize from ../config/database:', error.message);
+  try {
+    const models = require('../models');
+    sequelize = models.sequelize;
+    console.log('✅ Sequelize loaded from ../models');
+  } catch (error2) {
+    console.warn('⚠️ Could not load sequelize, using mock');
+    sequelize = {
+      fn: () => 'COUNT',
+      col: () => 'kodeSF'
+    };
+  }
+}
+
+try {
+  const excelParser = require('../services/excelParser');
+  parseSalesData = excelParser.parseSalesData;
+  console.log('✅ Excel parser loaded from ../services/excelParser');
+} catch (error) {
+  console.warn('⚠️ Could not load parseSalesData from ../services/excelParser:', error.message);
+  try {
+    const utilsParser = require('../utils/parseSalesData');
+    parseSalesData = utilsParser.parseSalesData;
+    console.log('✅ Excel parser loaded from ../utils/parseSalesData');
+  } catch (error2) {
+    console.warn('⚠️ Could not load parseSalesData, using basic parser');
+    // Basic parser fallback
+    parseSalesData = (filePath) => {
+      console.log('Using basic Excel parser for:', filePath);
+      try {
+        const workbook = xlsx.readFile(filePath);
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (data.length < 2) return [];
+
+        const headers = data[0];
+        const rows = data.slice(1);
+
+        return rows.map((row, index) => ({
+          kodeSF: row[headers.indexOf('Kode SF')] || `SF${index}`,
+          namaSF: row[headers.indexOf('Nama SF')] || 'Unknown',
+          kodeTL: row[headers.indexOf('Kode TL')] || 'TL001',
+          namaTL: row[headers.indexOf('Nama TL')] || 'Unknown TL',
+          agency: row[headers.indexOf('Agency')] || 'Unknown Agency',
+          area: row[headers.indexOf('Area')] || 'Unknown Area',
+          regional: row[headers.indexOf('Regional')] || 'Unknown Regional',
+          branch: row[headers.indexOf('Branch')] || 'Unknown Branch',
+          wok: row[headers.indexOf('Wilayah Operational Kerja')] || 'Unknown',
+          newOrderId: row[headers.indexOf('New Order ID')] || `ORDER${Date.now()}-${index}`,
+          tanggalPS: new Date(row[headers.indexOf('Tanggal PS')] || new Date())
+        }));
+      } catch (parseError) {
+        console.error('Basic parser error:', parseError.message);
+        return [];
+      }
+    };
+  }
+}
 
 const uploadSalesData = async (req, res) => {
+  console.log('=== UPLOAD SALES DATA CALLED ===');
+
   try {
+    console.log('Request file:', req.file);
+
     if (!req.file) {
-      return res.status(400).json({ msg: "File Excel tidak ditemukan" });
+      console.log('❌ No file found in request');
+      return res.status(400).json({
+        success: false,
+        msg: "File Excel tidak ditemukan"
+      });
     }
 
     const filePath = req.file.path;
-    const salesData = parseSalesData(filePath);
-    
-    const existingOrders = await SalesPerformance.findAll({
-      attributes: ['newOrderId'],
-      raw: true,
-      paranoid: false
-    });
-    const existingOrderIds = new Set(existingOrders.map(o => o.newOrderId));
+    console.log('Processing file:', filePath);
 
-    const uniqueSalesData = salesData.filter(d => !existingOrderIds.has(d.newOrderId));
-
-    if (uniqueSalesData.length > 0) {
-      await SalesPerformance.bulkCreate(uniqueSalesData);
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.log('❌ File not found on disk:', filePath);
+      return res.status(500).json({
+        success: false,
+        msg: "File tidak ditemukan di server"
+      });
     }
-    
-    fs.unlinkSync(filePath);
 
-    res.status(200).json({ msg: `Berhasil mengunggah ${uniqueSalesData.length} data baru.`, totalSkipped: salesData.length - uniqueSalesData.length });
+    console.log('📊 Parsing sales data...');
+    const salesData = parseSalesData(filePath);
+    console.log(`Parsed ${salesData.length} records from Excel`);
+
+    if (!salesData || salesData.length === 0) {
+      console.log('❌ No data found in file');
+      fs.unlinkSync(filePath); // Clean up
+      return res.status(400).json({
+        success: false,
+        msg: "Tidak ada data yang valid ditemukan dalam file"
+      });
+    }
+
+    console.log('Sample parsed data:', salesData[0]);
+
+    try {
+      console.log('🔍 Checking for existing orders...');
+
+      // Check for existing orders
+      const existingOrders = await SalesPerformance.findAll({
+        attributes: ['newOrderId'],
+        raw: true,
+        paranoid: false
+      });
+
+      const existingOrderIds = new Set(existingOrders.map(o => o.newOrderId));
+      console.log(`Found ${existingOrderIds.size} existing order IDs`);
+
+      // Filter out duplicates
+      const uniqueSalesData = salesData.filter(d => !existingOrderIds.has(d.newOrderId));
+      console.log(`${uniqueSalesData.length} unique records to insert`);
+
+      if (uniqueSalesData.length > 0) {
+        console.log('💾 Inserting data into database...');
+        await SalesPerformance.bulkCreate(uniqueSalesData);
+        console.log('✅ Data inserted successfully');
+      }
+
+      // Clean up file
+      console.log('🧹 Cleaning up uploaded file...');
+      fs.unlinkSync(filePath);
+
+      res.status(200).json({
+        success: true,
+        msg: `Berhasil mengunggah ${uniqueSalesData.length} data baru.`,
+        totalSkipped: salesData.length - uniqueSalesData.length,
+        data: {
+          totalRecords: salesData.length,
+          newRecords: uniqueSalesData.length,
+          skippedRecords: salesData.length - uniqueSalesData.length
+        }
+      });
+
+    } catch (dbError) {
+      console.error('❌ Database error:', dbError);
+      throw dbError;
+    }
+
   } catch (error) {
-    if (req.file) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: error.message });
+    console.error('❌ Error in uploadSalesData:', error);
+
+    // Clean up file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log('🧹 Cleaned up file after error');
+      } catch (cleanupError) {
+        console.warn('Could not clean up file:', cleanupError.message);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      msg: "Terjadi kesalahan saat memproses file"
+    });
   }
 };
 
@@ -47,12 +199,86 @@ const getSalesforceCategory = (psCount) => {
   return 'Diamond';
 };
 
-// --- Perbaikan di Sini: Menghitung metrik per sales ---
+const getWeeklyChange = (data) => {
+  const today = new Date();
+  const psLastWeek = data.filter(d => {
+    const date = new Date(d.tanggalPS);
+    return date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) && date <= today;
+  }).length;
+
+  const psTwoWeeksAgo = data.filter(d => {
+    const date = new Date(d.tanggalPS);
+    return date > new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000) &&
+      date <= new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  }).length;
+
+  if (psTwoWeeksAgo === 0) return psLastWeek > 0 ? 'N/A' : '0.00';
+  return (((psLastWeek - psTwoWeeksAgo) / psTwoWeeksAgo) * 100).toFixed(2);
+};
+
+const getMonthlyChange = (data) => {
+  const today = new Date();
+  const psThisMonth = data.filter(d => {
+    const date = new Date(d.tanggalPS);
+    return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+  }).length;
+
+  const lastMonth = new Date(today);
+  lastMonth.setMonth(today.getMonth() - 1);
+  const psLastMonth = data.filter(d => {
+    const date = new Date(d.tanggalPS);
+    return date.getMonth() === lastMonth.getMonth() && date.getFullYear() === lastMonth.getFullYear();
+  }).length;
+
+  if (psLastMonth === 0) return psThisMonth > 0 ? 'N/A' : '0.00';
+  return (((psThisMonth - psLastMonth) / psLastMonth) * 100).toFixed(2);
+};
+
+const getQuarterlyChange = (data) => {
+  const today = new Date();
+  const currentQuarter = Math.floor(today.getMonth() / 3);
+  const psThisQuarter = data.filter(d => {
+    const date = new Date(d.tanggalPS);
+    return Math.floor(date.getMonth() / 3) === currentQuarter && date.getFullYear() === today.getFullYear();
+  }).length;
+
+  const lastQuarter = new Date(today);
+  lastQuarter.setMonth(today.getMonth() - 3);
+  const prevQuarter = Math.floor(lastQuarter.getMonth() / 3);
+  const psPrevQuarter = data.filter(d => {
+    const date = new Date(d.tanggalPS);
+    return Math.floor(date.getMonth() / 3) === prevQuarter && date.getFullYear() === lastQuarter.getFullYear();
+  }).length;
+
+  if (psPrevQuarter === 0) return psThisQuarter > 0 ? 'N/A' : '0.00';
+  return (((psThisQuarter - psPrevQuarter) / psPrevQuarter) * 100).toFixed(2);
+};
+
+const getYearlyChange = (data) => {
+  const today = new Date();
+  const psThisYear = data.filter(d => {
+    const date = new Date(d.tanggalPS);
+    return date.getFullYear() === today.getFullYear();
+  }).length;
+
+  const lastYear = new Date(today);
+  lastYear.setFullYear(today.getFullYear() - 1);
+  const psLastYear = data.filter(d => {
+    const date = new Date(d.tanggalPS);
+    return date.getFullYear() === lastYear.getFullYear();
+  }).length;
+
+  if (psLastYear === 0) return psThisYear > 0 ? 'N/A' : '0.00';
+  return (((psThisYear - psLastYear) / psLastYear) * 100).toFixed(2);
+};
+
 const getMetrics = async (req, res) => {
+  console.log('getMetrics called');
   try {
     const allSalesData = await SalesPerformance.findAll({ raw: true });
+    console.log(`Found ${allSalesData.length} sales records for metrics`);
 
-    // Mengelompokkan data berdasarkan kodeSF
+    // Group data by kodeSF
     const salesDataByCode = allSalesData.reduce((acc, sale) => {
       if (!acc[sale.kodeSF]) {
         acc[sale.kodeSF] = [];
@@ -71,53 +297,22 @@ const getMetrics = async (req, res) => {
       };
     });
 
-    res.json(metricsPerSales);
+    res.json({
+      success: true,
+      data: metricsPerSales,
+      timestamp: new Date().toISOString()
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in getMetrics:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
   }
 };
 
-const getWeeklyChange = (data) => {
-  const today = new Date();
-  const psLastWeek = data.filter(d => d.tanggalPS > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) && d.tanggalPS <= today).length;
-  const psTwoWeeksAgo = data.filter(d => d.tanggalPS > new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000) && d.tanggalPS <= new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)).length;
-  if (psTwoWeeksAgo === 0) return psLastWeek > 0 ? 'N/A' : '0.00';
-  return (((psLastWeek - psTwoWeeksAgo) / psTwoWeeksAgo) * 100).toFixed(2);
-};
-
-const getMonthlyChange = (data) => {
-  const today = new Date();
-  const psThisMonth = data.filter(d => d.tanggalPS.getMonth() === today.getMonth() && d.tanggalPS.getFullYear() === today.getFullYear()).length;
-  const lastMonth = new Date(today);
-  lastMonth.setMonth(today.getMonth() - 1);
-  const psLastMonth = data.filter(d => d.tanggalPS.getMonth() === lastMonth.getMonth() && d.tanggalPS.getFullYear() === lastMonth.getFullYear()).length;
-  if (psLastMonth === 0) return psThisMonth > 0 ? 'N/A' : '0.00';
-  return (((psThisMonth - psLastMonth) / psLastMonth) * 100).toFixed(2);
-};
-
-const getQuarterlyChange = (data) => {
-  const today = new Date();
-  const currentQuarter = Math.floor(today.getMonth() / 3);
-  const psThisQuarter = data.filter(d => Math.floor(d.tanggalPS.getMonth() / 3) === currentQuarter && d.tanggalPS.getFullYear() === today.getFullYear()).length;
-  const lastQuarter = new Date(today);
-  lastQuarter.setMonth(today.getMonth() - 3);
-  const prevQuarter = Math.floor(lastQuarter.getMonth() / 3);
-  const psPrevQuarter = data.filter(d => Math.floor(d.tanggalPS.getMonth() / 3) === prevQuarter && d.tanggalPS.getFullYear() === lastQuarter.getFullYear()).length;
-  if (psPrevQuarter === 0) return psThisQuarter > 0 ? 'N/A' : '0.00';
-  return (((psThisQuarter - psPrevQuarter) / psPrevQuarter) * 100).toFixed(2);
-};
-
-const getYearlyChange = (data) => {
-  const today = new Date();
-  const psThisYear = data.filter(d => d.tanggalPS.getFullYear() === today.getFullYear()).length;
-  const lastYear = new Date(today);
-  lastYear.setFullYear(today.getFullYear() - 1);
-  const psLastYear = data.filter(d => d.tanggalPS.getFullYear() === lastYear.getFullYear()).length;
-  if (psLastYear === 0) return psThisYear > 0 ? 'N/A' : '0.00';
-  return (((psThisYear - psLastYear) / psLastYear) * 100).toFixed(2);
-};
-
 const getOverallPerformance = async (req, res) => {
+  console.log('getOverallPerformance called');
   try {
     const psData = await SalesPerformance.findAll({
       attributes: ['kodeSF', 'namaSF',
@@ -125,6 +320,8 @@ const getOverallPerformance = async (req, res) => {
       ],
       group: ['kodeSF', 'namaSF']
     });
+
+    console.log(`Found ${psData.length} sales force records`);
 
     const formattedData = psData.map(item => {
       const psCount = item.get('totalPs');
@@ -136,10 +333,24 @@ const getOverallPerformance = async (req, res) => {
       };
     });
 
-    res.json(formattedData);
+    res.json({
+      success: true,
+      data: formattedData,
+      timestamp: new Date().toISOString()
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in getOverallPerformance:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
   }
 };
 
-module.exports = { uploadSalesData, getOverallPerformance, getMetrics };
+console.log('✅ Dashboard controller loaded successfully');
+
+module.exports = {
+  uploadSalesData,
+  getOverallPerformance,
+  getMetrics
+};
