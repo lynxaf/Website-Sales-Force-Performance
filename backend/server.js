@@ -14,7 +14,7 @@ app.use(express.json());
 
 const reportsDir = path.join(__dirname, 'reports');
 if (!fs.existsSync(reportsDir)) {
-    fs.mkdirSync(reportsDir);
+  fs.mkdirSync(reportsDir);
 }
 
 // sequelize
@@ -28,6 +28,14 @@ if (!fs.existsSync(reportsDir)) {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+
+app.get('/api/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
