@@ -216,7 +216,7 @@ const getWeeklyChange = (data) => {
   }).length;
 
   if (psTwoWeeksAgo === 0) return psLastWeek > 0 ? 'N/A' : '0.00';
-  return (((psLastWeek - psTwoWeeksAgo) / psTwoWeeksAgo) * 100).toFixed(2);
+  return (((psLastWeek / psTwoWeeksAgo) - 1) * 100).toFixed(2);
 };
 
 const getMonthlyChange = (data) => {
@@ -234,7 +234,7 @@ const getMonthlyChange = (data) => {
   }).length;
 
   if (psLastMonth === 0) return psThisMonth > 0 ? 'N/A' : '0.00';
-  return (((psThisMonth - psLastMonth) / psLastMonth) * 100).toFixed(2);
+  return (((psThisMonth / psLastMonth) - 1) * 100).toFixed(2);
 };
 
 const getQuarterlyChange = (data) => {
@@ -254,7 +254,7 @@ const getQuarterlyChange = (data) => {
   }).length;
 
   if (psPrevQuarter === 0) return psThisQuarter > 0 ? 'N/A' : '0.00';
-  return (((psThisQuarter - psPrevQuarter) / psPrevQuarter) * 100).toFixed(2);
+  return (((psThisQuarter / psPrevQuarter) - 1) * 100).toFixed(2);
 };
 
 const getYearlyChange = (data) => {
@@ -272,7 +272,7 @@ const getYearlyChange = (data) => {
   }).length;
 
   if (psLastYear === 0) return psThisYear > 0 ? 'N/A' : '0.00';
-  return (((psThisYear - psLastYear) / psLastYear) * 100).toFixed(2);
+  return (((psThisYear / psLastYear) - 1) * 100).toFixed(2);
 };
 
 const getMetrics = async (req, res) => {
