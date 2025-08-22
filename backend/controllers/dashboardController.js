@@ -463,7 +463,56 @@ const getMonthlyPerformance = async (req, res) => {
   }
 };
 
+const getTotalPsPerMonth = async (req, res) => {
+  console.log('getTotalPsPerMonth called');
+  try {
+    let { year } = req.query;
+    const today = new Date();
+    year = year ? parseInt(year, 10) : today.getFullYear();
+
+    console.log(`Fetching total PS per month for year ${year}`);
+
+    // Ambil semua data PS untuk 1 tahun
+    const psData = await SalesPerformance.findAll({
+      where: {
+        tanggalPS: {
+          [Op.between]: [new Date(year, 0, 1), new Date(year, 11, 31, 23, 59, 59)]
+        },
+        kodeSF: { [Op.ne]: null },
+        namaSF: { [Op.ne]: null }
+      },
+      raw: true
+    });
+
+    console.log(`Found ${psData.length} records for year ${year}`);
+
+    // Group berdasarkan bulan
+    const monthlyTotals = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      totalPs: 0
+    }));
+
+    psData.forEach(item => {
+      const date = new Date(item.tanggalPS);
+      const month = date.getMonth(); // 0-11
+      monthlyTotals[month].totalPs += 1;
+    });
+
+    res.json({
+      success: true,
+      year,
+      monthlyTotals,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Error in getTotalPsPerMonth:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+};
 
 console.log('✅ Dashboard controller loaded successfully');
 
-module.exports = { uploadSalesData, getOverallPerformance, getMetrics, getMonthlyPerformance };
+module.exports = { uploadSalesData, getOverallPerformance, getMetrics, getMonthlyPerformance, getTotalPsPerMonth };
