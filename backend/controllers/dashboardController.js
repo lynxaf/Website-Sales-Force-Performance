@@ -81,85 +81,6 @@ try {
   }
 }
 
-// const uploadSalesData = async (req, res) => {
-//   console.log('=== UPLOAD SALES DATA CALLED ===');
-
-//   try {
-//     console.log('Request file:', req.file);
-
-//     if (!req.file) {
-//       console.log('❌ No file found in request');
-//       return res.status(400).json({
-//         success: false,
-//         msg: "File Excel tidak ditemukan"
-//       });
-//     }
-
-//     const filePath = req.file.path;
-//     console.log('Processing file:', filePath);
-
-//     // Check if file exists
-//     if (!fs.existsSync(filePath)) {
-//       console.log('❌ File not found on disk:', filePath);
-//       return res.status(500).json({
-//         success: false,
-//         msg: "File tidak ditemukan di server"
-//       });
-//     }
-
-//     console.log('📊 Parsing sales data...');
-//     const salesData = parseSalesData(filePath);
-
-//     const existingOrders = await SalesPerformance.findAll({
-//       attributes: ['newOrderId'],
-//       raw: true,
-//       paranoid: false
-//     });
-//     const existingOrderIds = new Set(existingOrders.map(o => o.newOrderId));
-
-//     const uniqueSalesData = salesData.filter(d => !existingOrderIds.has(d.newOrderId));
-
-//     if (uniqueSalesData.length > 0) {
-//       console.log('💾 Inserting data into database...');
-//       await SalesPerformance.bulkCreate(uniqueSalesData);
-//       console.log('✅ Data inserted successfully');
-//     }
-
-//     // Clean up file
-//     console.log('🧹 Cleaning up uploaded file...');
-//     fs.unlinkSync(filePath);
-
-//     res.status(200).json({
-//       success: true,
-//       msg: `Berhasil mengunggah ${uniqueSalesData.length} data baru.`,
-//       totalSkipped: salesData.length - uniqueSalesData.length,
-//       data: {
-//         totalRecords: salesData.length,
-//         newRecords: uniqueSalesData.length,
-//         skippedRecords: salesData.length - uniqueSalesData.length
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error('❌ Error in uploadSalesData:', error);
-
-//     // Clean up file if it exists
-//     if (req.file && fs.existsSync(req.file.path)) {
-//       try {
-//         fs.unlinkSync(req.file.path);
-//         console.log('🧹 Cleaned up file after error');
-//       } catch (cleanupError) {
-//         console.warn('Could not clean up file:', cleanupError.message);
-//       }
-//     }
-//     res.status(500).json({
-//       success: false,
-//       error: error.message,
-//       msg: "Terjadi kesalahan saat memproses file"
-//     });
-//   }
-// };
-
 const uploadSalesData = async (req, res) => {
   console.log('=== UPLOAD SALES DATA CALLED ===');
 
@@ -295,7 +216,7 @@ const getWeeklyChange = (data) => {
   }).length;
 
   if (psTwoWeeksAgo === 0) return psLastWeek > 0 ? 'N/A' : '0.00';
-  return (((psLastWeek - psTwoWeeksAgo) / psTwoWeeksAgo) * 100).toFixed(2);
+  return (((psLastWeek / psTwoWeeksAgo) - 1) * 100).toFixed(2);
 };
 
 const getMonthlyChange = (data) => {
@@ -313,7 +234,7 @@ const getMonthlyChange = (data) => {
   }).length;
 
   if (psLastMonth === 0) return psThisMonth > 0 ? 'N/A' : '0.00';
-  return (((psThisMonth - psLastMonth) / psLastMonth) * 100).toFixed(2);
+  return (((psThisMonth / psLastMonth) - 1) * 100).toFixed(2);
 };
 
 const getQuarterlyChange = (data) => {
@@ -333,7 +254,7 @@ const getQuarterlyChange = (data) => {
   }).length;
 
   if (psPrevQuarter === 0) return psThisQuarter > 0 ? 'N/A' : '0.00';
-  return (((psThisQuarter - psPrevQuarter) / psPrevQuarter) * 100).toFixed(2);
+  return (((psThisQuarter / psPrevQuarter) - 1) * 100).toFixed(2);
 };
 
 const getYearlyChange = (data) => {
@@ -351,7 +272,7 @@ const getYearlyChange = (data) => {
   }).length;
 
   if (psLastYear === 0) return psThisYear > 0 ? 'N/A' : '0.00';
-  return (((psThisYear - psLastYear) / psLastYear) * 100).toFixed(2);
+  return (((psThisYear / psLastYear) - 1) * 100).toFixed(2);
 };
 
 const getMetrics = async (req, res) => {
@@ -373,7 +294,7 @@ const getMetrics = async (req, res) => {
       data.sort((a, b) => new Date(a.tanggalPS) - new Date(b.tanggalPS));
 
       return {
-        namaSF: data[0].namaSF,
+        namaSF: data[0].namaSF,  
         kodeSF: kodeSF,
         WoW: getWeeklyChange(data),
         MoM: getMonthlyChange(data),
@@ -400,12 +321,34 @@ const getOverallPerformance = async (req, res) => {
   console.log('getOverallPerformance called');
   try {
     const psData = await SalesPerformance.findAll({
+      // Tambahkan klausa 'where' untuk menyaring data yang tidak valid
+      where: {
+        kodeSF: {
+          [Op.ne]: null
+        },
+        namaSF: {
+          [Op.ne]: null
+        }
+      },
       attributes: [
         'kodeSF',
         'namaSF',
+        'agency',
+        'area',
+        'regional',
+        'branch',
+        'wok',
         [sequelize.fn('COUNT', sequelize.col('kodeSF')), 'totalPs']
       ],
-      group: ['kodeSF', 'namaSF']
+      group: [
+        'kodeSF',
+        'namaSF',
+        'agency',
+        'area',
+        'regional',
+        'branch',
+        'wok'
+      ]
     });
 
     console.log(`Found ${psData.length} sales force records`);
@@ -417,6 +360,11 @@ const getOverallPerformance = async (req, res) => {
         namaSF: item.namaSF,
         totalPs: psCount,
         category: getSalesforceCategory(psCount),
+        agency: item.agency,
+        area: item.area,
+        regional: item.regional,
+        branch: item.branch,
+        wok: item.wok
       };
     });
 

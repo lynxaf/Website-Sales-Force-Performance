@@ -3,10 +3,11 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 console.log('Loading dashboard routes...');
 
-// Import your existing controller
+
 let dashboardController;
 try {
   dashboardController = require('../controllers/dashboardController');
@@ -16,14 +17,14 @@ try {
   throw error;
 }
 
-// Create reports directory
+
 const reportsDir = path.resolve('./reports');
 if (!fs.existsSync(reportsDir)) {
   console.log('Creating reports directory:', reportsDir);
   fs.mkdirSync(reportsDir, { recursive: true });
 }
 
-// Configure multer - matching your expected structure
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     console.log('Multer destination:', reportsDir);
@@ -74,7 +75,7 @@ router.get('/test', (req, res) => {
 });
 
 // Upload route - using your expected field name
-router.post('/upload', (req, res, next) => {
+router.post('/upload', protect, authorize('admin'), (req, res, next) => {
   console.log('=== UPLOAD ROUTE ACCESSED ===');
   console.log('Request method:', req.method);
   console.log('Content-Type:', req.get('Content-Type'));
@@ -107,7 +108,7 @@ router.post('/upload', (req, res, next) => {
 });
 
 // Overall performance route
-router.get('/overall', (req, res, next) => {
+router.get('/overall', protect, authorize(['admin', 'leader', 'sales']), (req, res, next) => {
   console.log('Overall performance route accessed');
   try {
     dashboardController.getOverallPerformance(req, res);
@@ -118,7 +119,7 @@ router.get('/overall', (req, res, next) => {
 });
 
 // Metrics route
-router.get('/metrics', (req, res, next) => {
+router.get('/metrics', protect, authorize(['admin', 'leader', 'sales']), (req, res, next) => {
   console.log('Metrics route accessed');
   try {
     dashboardController.getMetrics(req, res);

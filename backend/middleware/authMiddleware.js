@@ -5,14 +5,35 @@ const protect = (req, res, next) => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = decoded; 
       next();
     } catch (error) {
-      res.status(401).json({ message: 'Tidak diizinkan, token gagal.' });
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Token kedaluwarsa.' });
+      }
+      res.status(401).json({ message: 'Tidak diizinkan, token tidak valid.' });
     }
-  }
-  if (!token) {
+  } else {
     res.status(401).json({ message: 'Tidak diizinkan, tidak ada token.' });
   }
 };
-module.exports = { protect };
+
+const authorize = (roles = []) => {
+  // Jika 'roles' adalah string, ubah menjadi array untuk kemudahan
+  if (typeof roles === 'string') {
+    roles = [roles];
+  }
+
+  return (req, res, next) => {
+    // Periksa apakah peran pengguna (dari token) termasuk dalam peran yang diizinkan
+    if (!roles.includes(req.user.role)) {
+      // Jika tidak, kirimkan respons 'Forbidden'
+      return res.status(403).json({ message: 'Akses ditolak.' });
+    }
+    // Jika peran cocok, lanjutkan ke middleware atau controller berikutnya
+    next();
+  };
+};
+
+module.exports = { protect, authorize };
