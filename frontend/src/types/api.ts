@@ -1,12 +1,9 @@
-// src/types/api.ts
-import { Filters } from './dashboard'; // Add this import
-
 export interface ApiResponse<T> {
     success: boolean;
     data: T;
     error?: string;
     timestamp?: string;
-    filters?: Partial<Filters>; // Now Filters is imported
+    // filters?: Partial<Filters>;
 }
 
 export interface ApiError {
