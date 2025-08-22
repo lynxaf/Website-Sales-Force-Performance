@@ -118,6 +118,16 @@ router.get('/overall', protect, authorize(['admin', 'leader', 'sales']), (req, r
   }
 });
 
+router.get('/overall/monthly', protect, authorize(['admin', 'leader', 'sales']), (req, res, next) => {
+  console.log('Overall monthly performance route accessed');
+  try {
+    dashboardController.getMonthlyPerformance(req, res);
+  } catch (error) {
+    console.error('❌ Overall monthly performance error:', error);
+    next(error);
+  }
+});
+
 // Metrics route
 router.get('/metrics', protect, authorize(['admin', 'leader', 'sales']), (req, res, next) => {
   console.log('Metrics route accessed');

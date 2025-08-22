@@ -382,6 +382,88 @@ const getOverallPerformance = async (req, res) => {
   }
 };
 
+
+const getMonthlyPerformance = async (req, res) => {
+  console.log('getMonthlyPerformance called');
+  try {
+    let { month, year } = req.query;
+
+    // Default: bulan & tahun sekarang
+    const today = new Date();
+    month = month ? parseInt(month, 10) - 1 : today.getMonth(); // bulan di JS 0-based
+    year = year ? parseInt(year, 10) : today.getFullYear();
+
+    console.log(`Filtering data for period: ${month + 1}-${year}`);
+
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+    // Ambil data dari DB sesuai periode
+    const psData = await SalesPerformance.findAll({
+      where: {
+        tanggalPS: {
+          [Op.between]: [startDate, endDate]
+        },
+        kodeSF: { [Op.ne]: null },
+        namaSF: { [Op.ne]: null }
+      },
+      attributes: [
+        'kodeSF',
+        'namaSF',
+        'agency',
+        'area',
+        'regional',
+        'branch',
+        'wok',
+        [sequelize.fn('COUNT', sequelize.col('kodeSF')), 'totalPs']
+      ],
+      group: [
+        'kodeSF',
+        'namaSF',
+        'agency',
+        'area',
+        'regional',
+        'branch',
+        'wok'
+      ]
+    });
+
+    console.log(`Found ${psData.length} sales force records for monthly performance`);
+
+    const formattedData = psData.map(item => {
+      const psCount = parseInt(item.get('totalPs'), 10);
+      return {
+        kodeSF: item.kodeSF,
+        namaSF: item.namaSF,
+        totalPs: psCount,
+        category: getSalesforceCategory(psCount),
+        agency: item.agency,
+        area: item.area,
+        regional: item.regional,
+        branch: item.branch,
+        wok: item.wok
+      };
+    });
+
+    res.json({
+      success: true,
+      period: {
+        month: month + 1,
+        year: year
+      },
+      data: formattedData,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Error in getMonthlyPerformance:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+};
+
+
 console.log('✅ Dashboard controller loaded successfully');
 
-module.exports = { uploadSalesData, getOverallPerformance, getMetrics };
+module.exports = { uploadSalesData, getOverallPerformance, getMetrics, getMonthlyPerformance };
