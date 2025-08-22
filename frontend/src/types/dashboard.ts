@@ -4,7 +4,7 @@ export interface SalesForceData {
     kodeTL?: string;
     namaTL?: string;
     agency: string;
-    area?: string;
+    area: string;
     regional: string;
     branch: string;
     wok: string;
