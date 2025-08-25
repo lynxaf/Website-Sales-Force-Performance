@@ -1,14 +1,16 @@
-import React from 'react';
-import { Users, TrendingUp, BarChart3, Award } from 'lucide-react';
-import { Card } from '../ui/Card';
-import { DashboardStats } from '../../types/dashboard';
-import { formatNumber } from '../../utils/formatter';
-interface StatisticsCardsProps {
-    stats: DashboardStats;
-    loading?: boolean;
-}
+import React from "react";
+import { Users, TrendingUp, BarChart3, Award } from "lucide-react";
+import { Card } from "../ui/Card";
+import { DashboardStats } from "../../types/dashboard";
+import { formatNumber } from "../../utils/formatter";
 
-export const StatisticsCards: React.FC<StatisticsCardsProps> = ({ stats, loading }) => {
+type StatisticsCardsProps = {
+    stats: DashboardStats | null;
+    loading: boolean;
+    error?: string | null;
+};
+
+const StatisticsCards: React.FC<StatisticsCardsProps> = ({ stats, loading, error }) => {
     if (loading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -27,36 +29,48 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({ stats, loading
         );
     }
 
+    if (error) {
+        return (
+            <div className="p-6 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+                <p className="text-sm text-red-700">{error}</p>
+            </div>
+        );
+    }
+
+    if (!stats) return null;
+
     const cards = [
         {
-            title: 'Total Sales Force',
+            title: "Total Sales Force",
             value: formatNumber(stats.totalSalesForce),
             icon: Users,
-            color: 'text-blue-600',
-            bgColor: 'bg-blue-100'
+            color: "text-blue-600",
+            bgColor: "bg-blue-100",
         },
         {
-            title: 'Total PS Orders',
+            title: "Total PS Orders",
             value: formatNumber(stats.totalPS),
             icon: TrendingUp,
-            color: 'text-green-600',
-            bgColor: 'bg-green-100'
+            color: "text-green-600",
+            bgColor: "bg-green-100",
         },
         {
-            title: 'Average Performance',
+            title: "Average Performance",
             value: stats.avgPerformance,
             icon: BarChart3,
-            color: 'text-purple-600',
-            bgColor: 'bg-purple-100'
+            color: "text-purple-600",
+            bgColor: "bg-purple-100",
         },
         {
-            title: 'Top Performer',
-            value: stats.topPerformer?.namaSF || 'N/A',
-            subtitle: stats.topPerformer ? `${stats.topPerformer.totalPs} PS Orders` : '',
+            title: "Top Performer",
+            value: stats.topPerformer?.namaSF || "N/A",
+            subtitle: stats.topPerformer
+                ? `${stats.topPerformer.totalPs} PS Orders`
+                : "",
             icon: Award,
-            color: 'text-yellow-600',
-            bgColor: 'bg-yellow-100'
-        }
+            color: "text-yellow-600",
+            bgColor: "bg-yellow-100",
+        },
     ];
 
     return (
@@ -66,7 +80,9 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({ stats, loading
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-gray-600">{card.title}</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">{card.value}</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-1">
+                                {card.value}
+                            </p>
                             {card.subtitle && (
                                 <p className="text-sm text-gray-500 mt-1">{card.subtitle}</p>
                             )}
@@ -80,3 +96,5 @@ export const StatisticsCards: React.FC<StatisticsCardsProps> = ({ stats, loading
         </div>
     );
 };
+
+export default StatisticsCards;

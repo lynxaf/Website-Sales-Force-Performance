@@ -1,166 +1,98 @@
-import React from 'react';
-import { Card } from '../ui/Card';
-import { SalesForceData, MetricsData } from '../../types/dashboard';
-import { formatNumber, getCategoryColor, formatPercentage } from '../../utils/formatter';
+"use client";
+
+import React from "react";
+
+type SalesData = {
+    kodeSF: string;
+    namaSF: string;
+    totalPs: number;
+    category: string;
+    agency: string;
+    area: string;
+    regional: string;
+    branch: string;
+    wok: string;
+};
+
+type MetricsData = {
+    namaSF: string;
+    kodeSF: string;
+    WoW: string;
+    MoM: string;
+    QoQ: string;
+    YoY: string;
+};
 
 interface PerformanceTableProps {
-    salesData: SalesForceData[];
+    salesData: SalesData[];
     metricsData: MetricsData[];
-    loading?: boolean;
+    loading: boolean;
 }
 
-export const PerformanceTable: React.FC<PerformanceTableProps> = ({
+export default function PerformanceTable({
     salesData,
     metricsData,
-    loading
-}) => {
-    if (loading) {
-        return (
-            <Card padding="none">
-                <div className="p-6 border-b border-gray-200">
-                    <div className="animate-pulse">
-                        <div className="h-6 bg-gray-200 rounded w-48 mb-2"></div>
-                        <div className="h-4 bg-gray-200 rounded w-64"></div>
-                    </div>
-                </div>
-                <div className="p-6">
-                    <div className="animate-pulse space-y-4">
-                        {[...Array(5)].map((_, i) => (
-                            <div key={i} className="flex space-x-4">
-                                <div className="h-4 bg-gray-200 rounded flex-1"></div>
-                                <div className="h-4 bg-gray-200 rounded w-20"></div>
-                                <div className="h-4 bg-gray-200 rounded w-16"></div>
-                                <div className="h-4 bg-gray-200 rounded w-24"></div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </Card>
-        );
+    loading,
+}: PerformanceTableProps) {
+    if (loading) return <p>Loading data...</p>;
+
+    if (!salesData.length) {
+        return <p className="text-gray-500">No sales data available.</p>;
     }
 
-    return (
-        <Card padding="none">
-            <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Sales Force Performance</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                    Showing {salesData.length} sales force members
-                </p>
-            </div>
+    // Gabungkan salesData + metricsData berdasarkan kodeSF
+    const mergedData = salesData.map((sale) => {
+        const metric = metricsData.find((m) => m.kodeSF === sale.kodeSF);
+        return {
+            ...sale,
+            WoW: metric?.WoW || "-",
+            MoM: metric?.MoM || "-",
+            QoQ: metric?.QoQ || "-",
+            YoY: metric?.YoY || "-",
+        };
+    });
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Sales Force
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Code
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Regional/Branch
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total PS Orders
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Category
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Performance Metrics
-                            </th>
+    return (
+        <div className="p-4 overflow-x-auto">
+            <h2 className="text-xl font-bold mb-4">Performance Table</h2>
+            <table className="min-w-full border text-sm">
+                <thead>
+                    <tr className="bg-gray-200">
+                        <th className="border px-2 py-1">Kode SF</th>
+                        <th className="border px-2 py-1">Nama SF</th>
+                        <th className="border px-2 py-1">Total PS</th>
+                        <th className="border px-2 py-1">Category</th>
+                        <th className="border px-2 py-1">Agency</th>
+                        <th className="border px-2 py-1">Area</th>
+                        <th className="border px-2 py-1">Regional</th>
+                        <th className="border px-2 py-1">Branch</th>
+                        <th className="border px-2 py-1">Wok</th>
+                        <th className="border px-2 py-1">WoW</th>
+                        <th className="border px-2 py-1">MoM</th>
+                        <th className="border px-2 py-1">QoQ</th>
+                        <th className="border px-2 py-1">YoY</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {mergedData.map((row, i) => (
+                        <tr key={i} className="hover:bg-gray-100">
+                            <td className="border px-2 py-1">{row.kodeSF}</td>
+                            <td className="border px-2 py-1">{row.namaSF}</td>
+                            <td className="border px-2 py-1">{row.totalPs}</td>
+                            <td className="border px-2 py-1">{row.category}</td>
+                            <td className="border px-2 py-1">{row.agency}</td>
+                            <td className="border px-2 py-1">{row.area}</td>
+                            <td className="border px-2 py-1">{row.regional}</td>
+                            <td className="border px-2 py-1">{row.branch}</td>
+                            <td className="border px-2 py-1">{row.wok}</td>
+                            <td className="border px-2 py-1">{row.WoW}</td>
+                            <td className="border px-2 py-1">{row.MoM}</td>
+                            <td className="border px-2 py-1">{row.QoQ}</td>
+                            <td className="border px-2 py-1">{row.YoY}</td>
                         </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {salesData.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                    No data available
-                                </td>
-                            </tr>
-                        ) : (
-                            salesData.map((item) => {
-                                const metrics = metricsData.find(m => m.kodeSF === item.kodeSF);
-                                return (
-                                    <tr key={item.kodeSF} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div>
-                                                <div className="text-sm font-medium text-gray-900">
-                                                    {item.namaSF}
-                                                </div>
-                                                {item.agency && (
-                                                    <div className="text-sm text-gray-500">{item.agency}</div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-600">{item.kodeSF}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">{item.regional}</div>
-                                            <div className="text-sm text-gray-500">{item.branch}</div>
-                                            {item.wok && (
-                                                <div className="text-xs text-gray-400">{item.wok}</div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-semibold text-gray-900">
-                                                {formatNumber(item.totalPs)}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(item.category)}`}>
-                                                {item.category}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                            {metrics ? (
-                                                <div className="space-y-1">
-                                                    <div className="flex justify-between">
-                                                        <span>WoW:</span>
-                                                        <span className={`font-medium ${parseFloat(metrics.WoW) > 0 ? 'text-green-600' :
-                                                                parseFloat(metrics.WoW) < 0 ? 'text-red-600' : 'text-gray-600'
-                                                            }`}>
-                                                            {formatPercentage(metrics.WoW)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>MoM:</span>
-                                                        <span className={`font-medium ${parseFloat(metrics.MoM) > 0 ? 'text-green-600' :
-                                                                parseFloat(metrics.MoM) < 0 ? 'text-red-600' : 'text-gray-600'
-                                                            }`}>
-                                                            {formatPercentage(metrics.MoM)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>QoQ:</span>
-                                                        <span className={`font-medium ${parseFloat(metrics.QoQ) > 0 ? 'text-green-600' :
-                                                                parseFloat(metrics.QoQ) < 0 ? 'text-red-600' : 'text-gray-600'
-                                                            }`}>
-                                                            {formatPercentage(metrics.QoQ)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>YoY:</span>
-                                                        <span className={`font-medium ${parseFloat(metrics.YoY) > 0 ? 'text-green-600' :
-                                                                parseFloat(metrics.YoY) < 0 ? 'text-red-600' : 'text-gray-600'
-                                                            }`}>
-                                                            {formatPercentage(metrics.YoY)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <span className="text-gray-400">No metrics available</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </Card>
+                    ))}
+                </tbody>
+            </table>
+        </div>
     );
-};
+}

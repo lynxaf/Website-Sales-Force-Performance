@@ -7,7 +7,7 @@ import { Filters, FilterOptions } from '../../types/dashboard';
 
 interface FilterControlsProps {
     filters: Filters;
-    filterOptions: FilterOptions;
+    filterOptions: Partial<FilterOptions>; // ubah ke Partial supaya boleh kosong
     onFilterChange: (filters: Partial<Filters>) => void;
     onReset: () => void;
     loading?: boolean;
@@ -24,22 +24,23 @@ export const FilterControls: React.FC<FilterControlsProps> = ({
         onFilterChange({ [key]: value });
     };
 
+    // kasih fallback default []
     const selectOptions = {
         regional: [
             { value: '', label: 'All Regional' },
-            ...filterOptions.regional.map(option => ({ value: option, label: option }))
+            ...(filterOptions.regional ?? []).map(option => ({ value: option, label: option }))
         ],
         branch: [
             { value: '', label: 'All Branch' },
-            ...filterOptions.branch.map(option => ({ value: option, label: option }))
+            ...(filterOptions.branch ?? []).map(option => ({ value: option, label: option }))
         ],
         wok: [
             { value: '', label: 'All WOK' },
-            ...filterOptions.wok.map(option => ({ value: option, label: option }))
+            ...(filterOptions.wok ?? []).map(option => ({ value: option, label: option }))
         ],
         category: [
             { value: '', label: 'All Categories' },
-            ...filterOptions.category.map(option => ({ value: option, label: option }))
+            ...(filterOptions.category ?? []).map(option => ({ value: option, label: option }))
         ]
     };
 

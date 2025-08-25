@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { useFileUpload } from '../../hooks/useDashboardData';
 
 interface UploadModalProps {
     isOpen: boolean;
@@ -16,9 +15,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 }) => {
     const [dragActive, setDragActive] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadResult, setUploadResult] = useState<any>(null);
-
-    const { uploadFile, uploading, uploadError } = useFileUpload();
 
     const handleDrag = (e: React.DragEvent) => {
         e.preventDefault();
@@ -51,21 +50,52 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     const handleUpload = async () => {
         if (!selectedFile) return;
 
-        const result = await uploadFile(selectedFile);
-        if (result) {
+        // Validasi
+        const validTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel'
+        ];
+        if (!validTypes.includes(selectedFile.type)) {
+            setUploadError('Please select a valid Excel file (.xlsx or .xls)');
+            return;
+        }
+        if (selectedFile.size > 10 * 1024 * 1024) {
+            setUploadError('File size must be less than 10MB');
+            return;
+        }
+
+        setUploading(true);
+        setUploadError(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('sales_data', selectedFile); // <-- match dengan backend Express
+
+            const res = await fetch('http://localhost:5000/api/dashboard/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await res.json();
             setUploadResult(result);
-            if (result.success) {
+
+            if (res.ok && result.success) {
                 onUploadSuccess();
                 setTimeout(() => {
                     handleClose();
                 }, 2000);
             }
+        } catch (err) {
+            setUploadError('Upload failed. Please try again.');
+        } finally {
+            setUploading(false);
         }
     };
 
     const handleClose = () => {
         setSelectedFile(null);
         setUploadResult(null);
+        setUploadError(null);
         setDragActive(false);
         onClose();
     };
@@ -74,34 +104,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Background overlay */}
-            <div
-                className="fixed inset-0 bg-black bg-opacity-50"
-                onClick={handleClose}
-            />
-
-            {/* Modal content */}
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleClose} />
             <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                        Upload Excel File
-                    </h3>
-                    <button
-                        onClick={handleClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
+                    <h3 className="text-lg font-semibold text-gray-900">Upload Excel File</h3>
+                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                {/* Content */}
                 <div className="p-6 space-y-6">
-                    {/* Upload Area */}
                     <div
-                        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragActive
-                            ? 'border-blue-400 bg-blue-50'
-                            : 'border-gray-300 hover:border-gray-400'
+                        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
                             }`}
                         onDragEnter={handleDrag}
                         onDragLeave={handleDrag}
@@ -113,11 +127,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                             <p className="text-lg font-medium text-gray-900">
                                 {selectedFile ? selectedFile.name : 'Choose a file or drag it here'}
                             </p>
-                            <p className="text-sm text-gray-500">
-                                Excel files (.xlsx, .xls) up to 10MB
-                            </p>
+                            <p className="text-sm text-gray-500">Excel files (.xlsx, .xls) up to 10MB</p>
                         </div>
-
                         <div className="mt-4">
                             <label className="cursor-pointer">
                                 <span className="inline-block px-4 py-2 bg-gray-100 text-gray-700 rounded-md border border-gray-300 hover:bg-gray-200 transition-colors">
@@ -133,7 +144,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Error Message */}
                     {uploadError && (
                         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                             <AlertCircle className="w-5 h-5 text-red-600" />
@@ -141,7 +151,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                         </div>
                     )}
 
-                    {/* Success Message */}
                     {uploadResult?.success && (
                         <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                             <CheckCircle className="w-5 h-5 text-green-600" />
@@ -156,17 +165,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                         </div>
                     )}
 
-                    {/* Action Buttons */}
                     <div className="flex justify-end space-x-3">
                         <Button variant="outline" onClick={handleClose} disabled={uploading}>
                             Cancel
                         </Button>
-                        <Button
-                            onClick={handleUpload}
-                            disabled={!selectedFile || uploading}
-                            loading={uploading}
-                            icon={Upload}
-                        >
+                        <Button onClick={handleUpload} disabled={!selectedFile || uploading} loading={uploading} icon={Upload}>
                             {uploading ? 'Uploading...' : 'Upload File'}
                         </Button>
                     </div>

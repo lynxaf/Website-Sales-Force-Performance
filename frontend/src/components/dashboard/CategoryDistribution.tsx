@@ -1,57 +1,92 @@
-import React from 'react';
-import { PieChart } from 'lucide-react';
-import { Card } from '../ui/Card';
-import { CategoryStat } from '../../types/dashboard';
-import { getCategoryColor } from '../../utils/formatter';
+import React from "react";
 
-interface CategoryDistributionProps {
-    categoryStats: CategoryStat[];
-    loading?: boolean;
+interface CategoryStat {
+    category: string;
+    count: number;
+    percentage: string;
 }
 
-export const CategoryDistribution: React.FC<CategoryDistributionProps> = ({
-    categoryStats,
-    loading
-}) => {
-    if (loading) {
-        return (
-            <Card>
-                <div className="animate-pulse">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="w-5 h-5 bg-gray-200 rounded"></div>
-                        <div className="h-6 bg-gray-200 rounded w-32"></div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        {[...Array(6)].map((_, i) => (
-                            <div key={i} className="text-center">
-                                <div className="w-full h-16 bg-gray-200 rounded-lg mb-2"></div>
-                                <div className="h-4 bg-gray-200 rounded w-16 mx-auto"></div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </Card>
-        );
+interface Props {
+    endpoint?: string;
+}
+
+interface State {
+    categoryStats: CategoryStat[];
+    loading: boolean;
+    error: string | null;
+}
+
+export default class CategoryStats extends React.Component<Props, State> {
+    state: State = {
+        categoryStats: [],
+        loading: true,
+        error: null,
+    };
+
+    async componentDidMount() {
+        const endpoint =
+            this.props.endpoint || "http://localhost:5000/api/dashboard/overall";
+
+        try {
+            const res = await fetch(endpoint);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+            const data = await res.json();
+            console.log("API Response:", data); // 🔍 cek di console
+
+            // Pastikan data array
+            const items: any[] = Array.isArray(data)
+                ? data
+                : Array.isArray(data.data)
+                    ? data.data
+                    : [];
+
+            // Grouping kategori
+            const grouped: Record<string, number> = {};
+            let total = 0;
+
+            items.forEach((item: any) => {
+                const cat = item.category || "Unknown";
+                grouped[cat] = (grouped[cat] || 0) + 1;
+                total++;
+            });
+
+            const stats: CategoryStat[] = Object.entries(grouped).map(
+                ([category, count]) => ({
+                    category,
+                    count,
+                    percentage: total > 0 ? ((count / total) * 100).toFixed(1) : "0",
+                })
+            );
+
+            this.setState({ categoryStats: stats, loading: false });
+        } catch (err: any) {
+            console.error("Error fetching category stats:", err);
+            this.setState({ loading: false, error: err.message || "Fetch error" });
+        }
     }
 
-    return (
-        <Card>
-            <div className="flex items-center gap-2 mb-4">
-                <PieChart className="w-5 h-5 text-gray-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Category Distribution</h2>
-            </div>
+    render() {
+        const { categoryStats, loading, error } = this.state;
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {categoryStats.map((stat) => (
-                    <div key={stat.category} className="text-center">
-                        <div className={`w-full py-3 px-3 rounded-lg mb-2 ${getCategoryColor(stat.category)}`}>
-                            <div className="text-lg font-bold">{stat.count}</div>
-                            <div className="text-xs opacity-90">{stat.percentage}%</div>
-                        </div>
-                        <div className="text-sm font-medium text-gray-700">{stat.category}</div>
-                    </div>
-                ))}
+        if (loading) return <p>Loading...</p>;
+        if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
+
+        return (
+            <div>
+                <h2>Category Stats</h2>
+                {categoryStats.length === 0 ? (
+                    <p>No category data available</p>
+                ) : (
+                    <ul>
+                        {categoryStats.map((stat, i) => (
+                            <li key={i}>
+                                {stat.category}: {stat.count} ({stat.percentage}%)
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </div>
-        </Card>
-    );
-};
+        );
+    }
+}
