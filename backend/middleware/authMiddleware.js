@@ -29,7 +29,7 @@ const authorize = (roles = []) => {
     // Periksa apakah peran pengguna (dari token) termasuk dalam peran yang diizinkan
     if (!roles.includes(req.user.role)) {
       // Jika tidak, kirimkan respons 'Forbidden'
-      return res.status(403).json({ message: 'Akses ditolak.' });
+      return res.status(403).json({ message: 'Akses ditolak. Hanya Admin yang bisa upload PS' });
     }
     // Jika peran cocok, lanjutkan ke middleware atau controller berikutnya
     next();

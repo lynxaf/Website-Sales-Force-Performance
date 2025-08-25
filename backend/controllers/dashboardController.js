@@ -202,87 +202,137 @@ const getSalesforceCategory = (psCount) => {
   return 'Diamond';
 };
 
-const getWeeklyChange = (data) => {
-  const today = new Date();
-  const psLastWeek = data.filter(d => {
-    const date = new Date(d.tanggalPS);
-    return date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) && date <= today;
-  }).length;
+// const getWeeklyChange = (data) => {
+//   const today = new Date();
+//   const psLastWeek = data.filter(d => {
+//     const date = new Date(d.tanggalPS);
+//     return date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) && date <= today;
+//   }).length;
 
-  const psTwoWeeksAgo = data.filter(d => {
-    const date = new Date(d.tanggalPS);
-    return date > new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000) &&
-      date <= new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-  }).length;
+//   const psTwoWeeksAgo = data.filter(d => {
+//     const date = new Date(d.tanggalPS);
+//     return date > new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000) &&
+//       date <= new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+//   }).length;
 
-  if (psTwoWeeksAgo === 0) return psLastWeek > 0 ? 'N/A' : '0.00';
-  return (((psLastWeek / psTwoWeeksAgo) - 1) * 100).toFixed(2);
-};
+//   if (psTwoWeeksAgo === 0) return psLastWeek > 0 ? 'N/A' : '0.00';
+//   return (((psLastWeek / psTwoWeeksAgo) - 1) * 100).toFixed(2);
+// };
 
-const getMonthlyChange = (data) => {
-  const today = new Date();
-  const psThisMonth = data.filter(d => {
-    const date = new Date(d.tanggalPS);
-    return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
-  }).length;
+// const getMonthlyChange = (data) => {
+//   const today = new Date();
+//   const psThisMonth = data.filter(d => {
+//     const date = new Date(d.tanggalPS);
+//     return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+//   }).length;
 
-  const lastMonth = new Date(today);
-  lastMonth.setMonth(today.getMonth() - 1);
-  const psLastMonth = data.filter(d => {
-    const date = new Date(d.tanggalPS);
-    return date.getMonth() === lastMonth.getMonth() && date.getFullYear() === lastMonth.getFullYear();
-  }).length;
+//   const lastMonth = new Date(today);
+//   lastMonth.setMonth(today.getMonth() - 1);
+//   const psLastMonth = data.filter(d => {
+//     const date = new Date(d.tanggalPS);
+//     return date.getMonth() === lastMonth.getMonth() && date.getFullYear() === lastMonth.getFullYear();
+//   }).length;
 
-  if (psLastMonth === 0) return psThisMonth > 0 ? 'N/A' : '0.00';
-  return (((psThisMonth / psLastMonth) - 1) * 100).toFixed(2);
-};
+//   if (psLastMonth === 0) return psThisMonth > 0 ? 'N/A' : '0.00';
+//   return (((psThisMonth / psLastMonth) - 1) * 100).toFixed(2);
+// };
 
-const getQuarterlyChange = (data) => {
-  const today = new Date();
-  const currentQuarter = Math.floor(today.getMonth() / 3);
-  const psThisQuarter = data.filter(d => {
-    const date = new Date(d.tanggalPS);
-    return Math.floor(date.getMonth() / 3) === currentQuarter && date.getFullYear() === today.getFullYear();
-  }).length;
+// const getQuarterlyChange = (data) => {
+//   const today = new Date();
+//   const currentQuarter = Math.floor(today.getMonth() / 3);
+//   const psThisQuarter = data.filter(d => {
+//     const date = new Date(d.tanggalPS);
+//     return Math.floor(date.getMonth() / 3) === currentQuarter && date.getFullYear() === today.getFullYear();
+//   }).length;
 
-  const lastQuarter = new Date(today);
-  lastQuarter.setMonth(today.getMonth() - 3);
-  const prevQuarter = Math.floor(lastQuarter.getMonth() / 3);
-  const psPrevQuarter = data.filter(d => {
-    const date = new Date(d.tanggalPS);
-    return Math.floor(date.getMonth() / 3) === prevQuarter && date.getFullYear() === lastQuarter.getFullYear();
-  }).length;
+//   const lastQuarter = new Date(today);
+//   lastQuarter.setMonth(today.getMonth() - 3);
+//   const prevQuarter = Math.floor(lastQuarter.getMonth() / 3);
+//   const psPrevQuarter = data.filter(d => {
+//     const date = new Date(d.tanggalPS);
+//     return Math.floor(date.getMonth() / 3) === prevQuarter && date.getFullYear() === lastQuarter.getFullYear();
+//   }).length;
 
-  if (psPrevQuarter === 0) return psThisQuarter > 0 ? 'N/A' : '0.00';
-  return (((psThisQuarter / psPrevQuarter) - 1) * 100).toFixed(2);
-};
+//   if (psPrevQuarter === 0) return psThisQuarter > 0 ? 'N/A' : '0.00';
+//   return (((psThisQuarter / psPrevQuarter) - 1) * 100).toFixed(2);
+// };
 
-const getYearlyChange = (data) => {
-  const today = new Date();
-  const psThisYear = data.filter(d => {
-    const date = new Date(d.tanggalPS);
-    return date.getFullYear() === today.getFullYear();
-  }).length;
+// const getYearlyChange = (data) => {
+//   const today = new Date();
+//   const psThisYear = data.filter(d => {
+//     const date = new Date(d.tanggalPS);
+//     return date.getFullYear() === today.getFullYear();
+//   }).length;
 
-  const lastYear = new Date(today);
-  lastYear.setFullYear(today.getFullYear() - 1);
-  const psLastYear = data.filter(d => {
-    const date = new Date(d.tanggalPS);
-    return date.getFullYear() === lastYear.getFullYear();
-  }).length;
+//   const lastYear = new Date(today);
+//   lastYear.setFullYear(today.getFullYear() - 1);
+//   const psLastYear = data.filter(d => {
+//     const date = new Date(d.tanggalPS);
+//     return date.getFullYear() === lastYear.getFullYear();
+//   }).length;
 
-  if (psLastYear === 0) return psThisYear > 0 ? 'N/A' : '0.00';
-  return (((psThisYear / psLastYear) - 1) * 100).toFixed(2);
-};
+//   if (psLastYear === 0) return psThisYear > 0 ? 'N/A' : '0.00';
+//   return (((psThisYear / psLastYear) - 1) * 100).toFixed(2);
+// };
+
+// const getMetrics = async (req, res) => {
+//   console.log('getMetrics called');
+//   try {
+//     const allSalesData = await SalesPerformance.findAll({ raw: true });
+//     console.log(`Found ${allSalesData.length} sales records for metrics`);
+
+//     // Group data by kodeSF
+//     const salesDataByCode = allSalesData.reduce((acc, sale) => {
+//       if (!acc[sale.kodeSF]) {
+//         acc[sale.kodeSF] = [];
+//       }
+//       acc[sale.kodeSF].push(sale);
+//       return acc;
+//     }, {});
+
+//     const metricsPerSales = Object.entries(salesDataByCode).map(([kodeSF, data]) => {
+//       data.sort((a, b) => new Date(a.tanggalPS) - new Date(b.tanggalPS));
+
+//       return {
+//         namaSF: data[0].namaSF,  
+//         kodeSF: kodeSF,
+//         WoW: getWeeklyChange(data),
+//         MoM: getMonthlyChange(data),
+//         QoQ: getQuarterlyChange(data),
+//         YoY: getYearlyChange(data),
+//       };
+//     });
+
+//     res.json({
+//       success: true,
+//       data: metricsPerSales,
+//       timestamp: new Date().toISOString()
+//     });
+//   } catch (err) {
+//     console.error('Error in getMetrics:', err);
+//     res.status(500).json({
+//       success: false,
+//       error: err.message
+//     });
+//   }
+// };
 
 const getMetrics = async (req, res) => {
-  console.log('getMetrics called');
+  const { startDate, endDate } = req.query;
+  const today = endDate ? new Date(endDate) : new Date();
+
   try {
     const allSalesData = await SalesPerformance.findAll({ raw: true });
-    console.log(`Found ${allSalesData.length} sales records for metrics`);
+    
+    // Filter data berdasarkan rentang tanggal yang diberikan
+    const filteredData = allSalesData.filter(d => {
+        const saleDate = new Date(d.tanggalPS);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return saleDate >= start && saleDate <= end;
+    });
 
-    // Group data by kodeSF
-    const salesDataByCode = allSalesData.reduce((acc, sale) => {
+    const salesDataByCode = filteredData.reduce((acc, sale) => {
       if (!acc[sale.kodeSF]) {
         acc[sale.kodeSF] = [];
       }
@@ -294,12 +344,12 @@ const getMetrics = async (req, res) => {
       data.sort((a, b) => new Date(a.tanggalPS) - new Date(b.tanggalPS));
 
       return {
-        namaSF: data[0].namaSF,  
+        namaSF: data[0].namaSF,
         kodeSF: kodeSF,
-        WoW: getWeeklyChange(data),
-        MoM: getMonthlyChange(data),
-        QoQ: getQuarterlyChange(data),
-        YoY: getYearlyChange(data),
+        WoW: getWeeklyChange(data, today),
+        MoM: getMonthlyChange(data, today),
+        QoQ: getQuarterlyChange(data, today),
+        YoY: getYearlyChange(data, today),
       };
     });
 
@@ -309,12 +359,70 @@ const getMetrics = async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (err) {
-    console.error('Error in getMetrics:', err);
     res.status(500).json({
       success: false,
       error: err.message
     });
   }
+};
+
+const getWeeklyChange = (data, endDate) => {
+  const endOfWeek = new Date(endDate);
+  endOfWeek.setHours(23, 59, 59, 999);
+  const startOfWeek = new Date(endOfWeek.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const startOfPreviousWeek = new Date(endOfWeek.getTime() - 14 * 24 * 60 * 60 * 1000);
+  
+  const psThisWeek = data.filter(d => d.tanggalPS > startOfWeek && d.tanggalPS <= endOfWeek).length;
+  const psLastWeek = data.filter(d => d.tanggalPS > startOfPreviousWeek && d.tanggalPS <= startOfWeek).length;
+  
+  if (psLastWeek === 0) return psThisWeek > 0 ? 'N/A' : '0.00';
+  return (((psThisWeek - psLastWeek) / psLastWeek) * 100).toFixed(2);
+};
+
+const getMonthlyChange = (data, endDate) => {
+  const endOfMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0, 23, 59, 59, 999);
+  const startOfMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1, 0, 0, 0, 0);
+  
+  const lastMonth = new Date(endDate);
+  lastMonth.setMonth(endDate.getMonth() - 1);
+  const endOfLastMonth = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+  const startOfLastMonth = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1, 0, 0, 0, 0);
+
+  const psThisMonth = data.filter(d => d.tanggalPS > startOfMonth && d.tanggalPS <= endOfMonth).length;
+  const psLastMonth = data.filter(d => d.tanggalPS > startOfLastMonth && d.tanggalPS <= endOfLastMonth).length;
+
+  if (psLastMonth === 0) return psThisMonth > 0 ? 'N/A' : '0.00';
+  return (((psThisMonth - psLastMonth) / psLastMonth) * 100).toFixed(2);
+};
+
+const getQuarterlyChange = (data, endDate) => {
+  const endOfMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0, 23, 59, 59, 999);
+  const startOfMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1, 0, 0, 0, 0);
+  
+  const psThisQuarter = data.filter(d => d.tanggalPS >= startOfMonth && d.tanggalPS <= endOfMonth).length;
+  
+  const startOfLastQuarter = new Date(endDate.getFullYear(), endDate.getMonth() - 3, 1, 0, 0, 0, 0);
+  const endOfLastQuarter = new Date(endDate.getFullYear(), endDate.getMonth() - 2, 0, 23, 59, 59, 999);
+  const psPrevQuarter = data.filter(d => d.tanggalPS >= startOfLastQuarter && d.tanggalPS <= endOfLastQuarter).length;
+  
+  if (psPrevQuarter === 0) return psThisQuarter > 0 ? 'N/A' : '0.00';
+  return (((psThisQuarter - psPrevQuarter) / psPrevQuarter) * 100).toFixed(2);
+};
+
+const getYearlyChange = (data, endDate) => {
+  const endOfYear = new Date(endDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+  const startOfYear = new Date(endDate.getFullYear(), 0, 1, 0, 0, 0, 0);
+  
+  const psThisYear = data.filter(d => d.tanggalPS >= startOfYear && d.tanggalPS <= endOfYear).length;
+  
+  const lastYear = new Date(endDate);
+  lastYear.setFullYear(endDate.getFullYear() - 1);
+  const endOfLastYear = new Date(lastYear.getFullYear(), 11, 31, 23, 59, 59, 999);
+  const startOfLastYear = new Date(lastYear.getFullYear(), 0, 1, 0, 0, 0, 0);
+  const psLastYear = data.filter(d => d.tanggalPS >= startOfLastYear && d.tanggalPS <= endOfLastYear).length;
+  
+  if (psLastYear === 0) return psThisYear > 0 ? 'N/A' : '0.00';
+  return (((psThisYear - psLastYear) / psLastYear) * 100).toFixed(2);
 };
 
 const getOverallPerformance = async (req, res) => {
