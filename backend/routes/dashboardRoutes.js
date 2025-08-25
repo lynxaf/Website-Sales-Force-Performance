@@ -169,32 +169,13 @@ router.get('/overall', (req, res, next) => {
 //     next(error);
 //   }
 // });
+
 router.get('/overall/monthly', (req, res, next) => {
   console.log('Overall monthly performance route accessed');
   try {
     dashboardController.getMonthlyPerformance(req, res);
   } catch (error) {
     console.error('❌ Overall monthly performance error:', error);
-    next(error);
-  }
-});
-
-// Total PS per month route
-// router.get('/overall/monthly/total', protect, authorize(['admin', 'leader', 'sales']), (req, res, next) => {
-//   console.log('Total PS per month route accessed');
-//   try {
-//     dashboardController.getTotalPsPerMonth(req, res);
-//   } catch (error) {
-//     console.error('❌ Total PS per month error:', error);
-//     next(error);
-//   }
-// });
-router.get('/overall/monthly/total', (req, res, next) => {
-  console.log('Total PS per month route accessed');
-  try {
-    dashboardController.getTotalPsPerMonth(req, res);
-  } catch (error) {
-    console.error('❌ Total PS per month error:', error);
     next(error);
   }
 });
