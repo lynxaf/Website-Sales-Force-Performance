@@ -55,18 +55,40 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
         fetch(`${backendUrl}/api/dashboard/metrics`),
       ]);
 
+      // Check if responses are OK
+      if (!salesRes.ok) {
+        throw new Error(`Sales API error: ${salesRes.status} ${salesRes.statusText}`);
+      }
+      if (!metricsRes.ok) {
+        throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}`);
+      }
+
       const rawSales = await salesRes.json();
       const rawMetrics = await metricsRes.json();
 
+      // Debug: Log the actual API responses
+      console.log("Sales API Response:", rawSales);
+      console.log("Metrics API Response:", rawMetrics);
+
+      // Extract data based on your backend controller structure
+      const salesData = rawSales.success ? rawSales.data : [];
+      const metricsData = rawMetrics.success ? rawMetrics.data : [];
+
+      console.log("Extracted Sales Data:", salesData);
+      console.log("Extracted Metrics Data:", metricsData);
+
       this.setState({
-        salesData: Array.isArray(rawSales) ? rawSales : rawSales.salesData || [],
-        metricsData: Array.isArray(rawMetrics) ? rawMetrics : rawMetrics.metricsData || [],
+        salesData: salesData || [],
+        metricsData: metricsData || [],
         filterOptions: rawSales.filterOptions || {},
         loading: false,
       });
-    } catch (err: any) {
-      this.setState({ error: "Failed to fetch dashboard data", loading: false });
+    } catch (err) {
       console.error("Error fetching dashboard data:", err);
+      this.setState({
+        error: `Failed to fetch dashboard data: ${err.message}`,
+        loading: false
+      });
     }
   };
   handleUploadSuccess = () => {
