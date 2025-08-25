@@ -35,7 +35,7 @@ export const useFileUpload = () => {
 
         try {
             const formData = new FormData();
-            formData.append('excelFile', file);
+            formData.append('sales_data', file);
 
             const response = await apiClient.post<UploadResponse>(
                 API_ENDPOINTS.UPLOAD,

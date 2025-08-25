@@ -11,9 +11,8 @@ export const API_ENDPOINTS = {
     PERFORMANCE: '/api/dashboard/overall',
     METRICS: '/api/dashboard/metrics',
     UPLOAD: '/api/dashboard/upload',
-    // Remove these endpoints since they don't exist
-    // EXPORT: '/api/dashboard/export',
-    // FILTER_OPTIONS: '/api/dashboard/filter-options'
+    MONTHLY: '/api/dashboard/monthly',
+    TOTAL_PS_PER_MONTH: '/api/dashboard/total-ps-per-month'
 } as const;
 
 export const DEFAULT_FILTERS = {
