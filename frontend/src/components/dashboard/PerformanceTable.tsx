@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, ChangeEvent, useMemo } from "react";
+import React, { useState, useMemo, ChangeEvent } from "react";
 
 type SalesData = {
     kodeSF: string;
@@ -30,34 +30,19 @@ interface PerformanceTableProps {
 }
 
 export default function PerformanceTable({ salesData, metricsData, loading }: PerformanceTableProps) {
+    // Hooks always at top
     const [regionalFilter, setRegionalFilter] = useState("");
     const [branchFilter, setBranchFilter] = useState("");
     const [wokFilter, setWokFilter] = useState("");
 
-    if (loading) return <p>Loading data...</p>;
-    if (!salesData.length) return <p className="text-gray-500">No sales data available.</p>;
-
-    // Generate filter options dynamically
-    const regionalOptions = Array.from(new Set(salesData.map((d) => d.regional).filter(Boolean)));
-    const branchOptions = Array.from(
-        new Set(salesData.filter((d) => !regionalFilter || d.regional === regionalFilter).map((d) => d.branch).filter(Boolean))
-    );
-    const wokOptions = Array.from(
-        new Set(
-            salesData
-                .filter((d) => (!regionalFilter || d.regional === regionalFilter) && (!branchFilter || d.branch === branchFilter))
-                .map((d) => d.wok)
-                .filter(Boolean)
-        )
-    );
-
-    // Merge sales + metrics
+    // Merge sales + metrics with filters
     const mergedData = useMemo(() => {
         return salesData
-            .filter((sale) =>
-                (!regionalFilter || sale.regional === regionalFilter) &&
-                (!branchFilter || sale.branch === branchFilter) &&
-                (!wokFilter || sale.wok === wokFilter)
+            .filter(
+                (sale) =>
+                    (!regionalFilter || sale.regional === regionalFilter) &&
+                    (!branchFilter || sale.branch === branchFilter) &&
+                    (!wokFilter || sale.wok === wokFilter)
             )
             .map((sale) => {
                 const metric = metricsData.find((m) => m.kodeSF === sale.kodeSF);
@@ -85,72 +70,109 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
         }
     };
 
+    if (loading) return <p>Loading data...</p>;
+    if (!salesData.length) return <p className="text-gray-500">No sales data available.</p>;
+
+    // Dynamic filter options
+    const regionalOptions = Array.from(new Set(salesData.map((d) => d.regional).filter(Boolean)));
+    const branchOptions = Array.from(
+        new Set(salesData.filter((d) => !regionalFilter || d.regional === regionalFilter).map((d) => d.branch).filter(Boolean))
+    );
+    const wokOptions = Array.from(
+        new Set(
+            salesData
+                .filter((d) => (!regionalFilter || d.regional === regionalFilter) && (!branchFilter || d.branch === branchFilter))
+                .map((d) => d.wok)
+                .filter(Boolean)
+        )
+    );
+
     return (
-        <div className="p-4 overflow-x-auto">
-            <h2 className="text-xl font-bold mb-4">Performance Table</h2>
+        <div className="p-4">
+            <h2 className="text-2xl font-bold mb-4">Performance Table</h2>
 
             {/* Filters */}
-            <div className="mb-4 flex gap-2">
-                <select name="regional" value={regionalFilter} onChange={handleFilterChange}>
-                    <option value="">All Regional</option>
-                    {regionalOptions.map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                    ))}
-                </select>
+            <div className="flex flex-wrap gap-4 mb-4">
+                <div className="flex flex-col">
+                    <label className="text-sm font-medium text-gray-600">Regional</label>
+                    <select
+                        name="regional"
+                        value={regionalFilter}
+                        onChange={handleFilterChange}
+                        className="border rounded px-2 py-1"
+                    >
+                        <option value="">All Regional</option>
+                        {regionalOptions.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                        ))}
+                    </select>
+                </div>
 
-                <select name="branch" value={branchFilter} onChange={handleFilterChange}>
-                    <option value="">All Branches</option>
-                    {branchOptions.map((b) => (
-                        <option key={b} value={b}>{b}</option>
-                    ))}
-                </select>
+                <div className="flex flex-col">
+                    <label className="text-sm font-medium text-gray-600">Branch</label>
+                    <select
+                        name="branch"
+                        value={branchFilter}
+                        onChange={handleFilterChange}
+                        className="border rounded px-2 py-1"
+                    >
+                        <option value="">All Branches</option>
+                        {branchOptions.map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                        ))}
+                    </select>
+                </div>
 
-                <select name="wok" value={wokFilter} onChange={handleFilterChange}>
-                    <option value="">All WOK</option>
-                    {wokOptions.map((w) => (
-                        <option key={w} value={w}>{w}</option>
-                    ))}
-                </select>
+                <div className="flex flex-col">
+                    <label className="text-sm font-medium text-gray-600">WOK</label>
+                    <select
+                        name="wok"
+                        value={wokFilter}
+                        onChange={handleFilterChange}
+                        className="border rounded px-2 py-1"
+                    >
+                        <option value="">All WOK</option>
+                        {wokOptions.map((w) => (
+                            <option key={w} value={w}>{w}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
-            <table className="min-w-full border text-sm">
-                <thead>
-                    <tr className="bg-gray-200">
-                        <th className="border px-2 py-1">Kode SF</th>
-                        <th className="border px-2 py-1">Nama SF</th>
-                        <th className="border px-2 py-1">Total PS</th>
-                        <th className="border px-2 py-1">Category</th>
-                        <th className="border px-2 py-1">Agency</th>
-                        <th className="border px-2 py-1">Area</th>
-                        <th className="border px-2 py-1">Regional</th>
-                        <th className="border px-2 py-1">Branch</th>
-                        <th className="border px-2 py-1">Wok</th>
-                        <th className="border px-2 py-1">WoW</th>
-                        <th className="border px-2 py-1">MoM</th>
-                        <th className="border px-2 py-1">QoQ</th>
-                        <th className="border px-2 py-1">YoY</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {mergedData.map((row, i) => (
-                        <tr key={i} className="hover:bg-gray-100">
-                            <td className="border px-2 py-1">{row.kodeSF}</td>
-                            <td className="border px-2 py-1">{row.namaSF}</td>
-                            <td className="border px-2 py-1">{row.totalPs}</td>
-                            <td className="border px-2 py-1">{row.category}</td>
-                            <td className="border px-2 py-1">{row.agency}</td>
-                            <td className="border px-2 py-1">{row.area}</td>
-                            <td className="border px-2 py-1">{row.regional}</td>
-                            <td className="border px-2 py-1">{row.branch}</td>
-                            <td className="border px-2 py-1">{row.wok}</td>
-                            <td className="border px-2 py-1">{row.WoW}</td>
-                            <td className="border px-2 py-1">{row.MoM}</td>
-                            <td className="border px-2 py-1">{row.QoQ}</td>
-                            <td className="border px-2 py-1">{row.YoY}</td>
+            {/* Table */}
+            <div className="overflow-x-auto">
+                <table className="min-w-full border text-sm divide-y divide-gray-200">
+                    <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                            {[
+                                "Kode SF", "Nama SF", "Total PS", "Category", "Agency", "Area", "Regional", "Branch", "Wok",
+                                "WoW", "MoM", "QoQ", "YoY"
+                            ].map((header) => (
+                                <th key={header} className="px-3 py-2 text-left font-medium text-gray-700">{header}</th>
+                            ))}
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {mergedData.map((row, i) => (
+                            <tr key={i} className="hover:bg-gray-50 transition">
+                                <td className="px-3 py-2">{row.kodeSF}</td>
+                                <td className="px-3 py-2">{row.namaSF}</td>
+                                <td className="px-3 py-2">{row.totalPs}</td>
+                                <td className="px-3 py-2">{row.category}</td>
+                                <td className="px-3 py-2">{row.agency}</td>
+                                <td className="px-3 py-2">{row.area}</td>
+                                <td className="px-3 py-2">{row.regional}</td>
+                                <td className="px-3 py-2">{row.branch}</td>
+                                <td className="px-3 py-2">{row.wok}</td>
+                                <td className="px-3 py-2">{row.WoW}</td>
+                                <td className="px-3 py-2">{row.MoM}</td>
+                                <td className="px-3 py-2">{row.QoQ}</td>
+                                <td className="px-3 py-2">{row.YoY}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }
