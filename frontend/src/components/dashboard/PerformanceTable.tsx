@@ -17,6 +17,11 @@ type SalesData = {
 type MetricsData = {
     namaSF: string;
     kodeSF: string;
+    agency: string;
+    area: string;
+    regional: string;
+    branch: string;
+    wok: string;
     WoW: string;
     MoM: string;
     QoQ: string;
@@ -46,8 +51,9 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
     const [endDate, setEndDate] = useState("");
     const [dateFilterType, setDateFilterType] = useState<"monthly" | "range">("monthly");
 
-    // Pagination hooks
-    const [currentPage, setCurrentPage] = useState(1);
+    // Pagination hooks for both tables
+    const [currentPageSales, setCurrentPageSales] = useState(1);
+    const [currentPageMetrics, setCurrentPageMetrics] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Fetch data function
@@ -58,7 +64,6 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
             if (dateFilterType === "monthly") {
-                // For monthly filter, use the monthly endpoint
                 const salesUrl = `${backendUrl}/api/dashboard/overall/monthly?month=${month}&year=${year}`;
 
                 console.log("Fetching monthly data from:", salesUrl);
@@ -77,11 +82,10 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                 const salesData = rawSales.success ? rawSales.data : (Array.isArray(rawSales) ? rawSales : []);
 
                 setSalesData(salesData || []);
-                setMetricsData([]); // Clear metrics data for monthly view
+                setMetricsData([]);
                 setLoading(false);
 
             } else if (dateFilterType === "range" && startDate && endDate) {
-                // For date range filter, use the metrics endpoint
                 const metricsUrl = `${backendUrl}/api/dashboard/metrics?startDate=${startDate}&endDate=${endDate}`;
 
                 console.log("Fetching date range data from:", metricsUrl);
@@ -99,25 +103,11 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
 
                 const metricsData = rawMetrics.success ? rawMetrics.data : (Array.isArray(rawMetrics) ? rawMetrics : []);
 
-                // For date range, the metrics endpoint contains full sales data + metrics
-                const salesDataFromMetrics = (metricsData || []).map((metric: any) => ({
-                    kodeSF: metric.kodeSF || "",
-                    namaSF: metric.namaSF || "",
-                    totalPs: metric.totalPs || 0, // May not be in metrics endpoint
-                    category: metric.category || "", // May not be in metrics endpoint  
-                    agency: metric.agency || "",
-                    area: metric.area || "",
-                    regional: metric.regional || "",
-                    branch: metric.branch || "",
-                    wok: metric.wok || ""
-                }));
-
-                setSalesData(salesDataFromMetrics);
+                setSalesData([]);
                 setMetricsData(metricsData || []);
                 setLoading(false);
 
             } else {
-                // If date range is selected but no dates provided, clear data
                 setSalesData([]);
                 setMetricsData([]);
                 setLoading(false);
@@ -139,56 +129,44 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
         }
     }, [dateFilterType, month, year, startDate, endDate]);
 
-    // Merge sales + metrics with filters based on dateFilterType
-    const filteredData = useMemo(() => {
-        if (dateFilterType === "monthly") {
-            // For monthly data, use only the sales data from monthly endpoint
-            return salesData
-                .filter(
-                    (sale) =>
-                        (!regionalFilter || sale.regional === regionalFilter) &&
-                        (!branchFilter || sale.branch === branchFilter) &&
-                        (!wokFilter || sale.wok === wokFilter)
-                )
-                .map((sale) => ({
-                    ...sale,
-                    WoW: "-", // Not available in monthly endpoint
-                    MoM: "-", // Not available in monthly endpoint
-                    QoQ: "-", // Not available in monthly endpoint
-                    YoY: "-"  // Not available in monthly endpoint
-                }));
-        } else {
-            // For date range data, use the metrics data
-            return salesData
-                .filter(
-                    (sale) =>
-                        (!regionalFilter || sale.regional === regionalFilter) &&
-                        (!branchFilter || sale.branch === branchFilter) &&
-                        (!wokFilter || sale.wok === wokFilter)
-                )
-                .map((sale) => {
-                    const metric = metricsData.find((m) => m.kodeSF === sale.kodeSF);
-                    return {
-                        ...sale,
-                        WoW: metric?.WoW || "-",
-                        MoM: metric?.MoM || "-",
-                        QoQ: metric?.QoQ || "-",
-                        YoY: metric?.YoY || "-",
-                    };
-                });
-        }
-    }, [salesData, metricsData, regionalFilter, branchFilter, wokFilter, dateFilterType]);
+    // Filter sales data
+    const filteredSalesData = useMemo(() => {
+        return salesData.filter(
+            (sale) =>
+                (!regionalFilter || sale.regional === regionalFilter) &&
+                (!branchFilter || sale.branch === branchFilter) &&
+                (!wokFilter || sale.wok === wokFilter)
+        );
+    }, [salesData, regionalFilter, branchFilter, wokFilter]);
 
-    // Pagination calculations
-    const totalItems = filteredData.length;
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedData = filteredData.slice(startIndex, endIndex);
+    // Filter metrics data
+    const filteredMetricsData = useMemo(() => {
+        return metricsData.filter(
+            (metric) =>
+                (!regionalFilter || metric.regional === regionalFilter) &&
+                (!branchFilter || metric.branch === branchFilter) &&
+                (!wokFilter || metric.wok === wokFilter)
+        );
+    }, [metricsData, regionalFilter, branchFilter, wokFilter]);
 
-    // Reset to first page when filters change
+    // Pagination for sales data
+    const totalSalesItems = filteredSalesData.length;
+    const totalSalesPages = Math.ceil(totalSalesItems / itemsPerPage);
+    const salesStartIndex = (currentPageSales - 1) * itemsPerPage;
+    const salesEndIndex = salesStartIndex + itemsPerPage;
+    const paginatedSalesData = filteredSalesData.slice(salesStartIndex, salesEndIndex);
+
+    // Pagination for metrics data
+    const totalMetricsItems = filteredMetricsData.length;
+    const totalMetricsPages = Math.ceil(totalMetricsItems / itemsPerPage);
+    const metricsStartIndex = (currentPageMetrics - 1) * itemsPerPage;
+    const metricsEndIndex = metricsStartIndex + itemsPerPage;
+    const paginatedMetricsData = filteredMetricsData.slice(metricsStartIndex, metricsEndIndex);
+
+    // Reset pagination when filters change
     useEffect(() => {
-        setCurrentPage(1);
+        setCurrentPageSales(1);
+        setCurrentPageMetrics(1);
     }, [regionalFilter, branchFilter, wokFilter, itemsPerPage, dateFilterType, month, year, startDate, endDate]);
 
     const handleFilterChange = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -224,11 +202,7 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
         setItemsPerPage(Number(e.target.value));
     };
 
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page);
-    };
-
-    const getPageNumbers = () => {
+    const getPageNumbers = (currentPage: number, totalPages: number) => {
         const delta = 2;
         const range = [];
         const rangeWithDots = [];
@@ -254,15 +228,17 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
         return rangeWithDots;
     };
 
-    // Generate filter options
+    // Generate filter options based on active data
     const getFilterOptions = () => {
-        const regionalOpts = salesData.length > 0 ? Array.from(new Set(salesData.map((d) => d.regional).filter(Boolean))) : [];
-        const branchOpts = salesData.length > 0 ? Array.from(
-            new Set(salesData.filter((d) => !regionalFilter || d.regional === regionalFilter).map((d) => d.branch).filter(Boolean))
+        const activeData = dateFilterType === "monthly" ? salesData : metricsData;
+
+        const regionalOpts = activeData.length > 0 ? Array.from(new Set(activeData.map((d) => d.regional).filter(Boolean))) : [];
+        const branchOpts = activeData.length > 0 ? Array.from(
+            new Set(activeData.filter((d) => !regionalFilter || d.regional === regionalFilter).map((d) => d.branch).filter(Boolean))
         ) : [];
-        const wokOpts = salesData.length > 0 ? Array.from(
+        const wokOpts = activeData.length > 0 ? Array.from(
             new Set(
-                salesData
+                activeData
                     .filter((d) => (!regionalFilter || d.regional === regionalFilter) && (!branchFilter || d.branch === branchFilter))
                     .map((d) => d.wok)
                     .filter(Boolean)
@@ -281,7 +257,7 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
     if (error) {
         return (
             <div className="p-4">
-                <h2 className="text-2xl font-bold mb-4">Performance Table</h2>
+                <h2 className="text-2xl font-bold mb-4">Performance Tables</h2>
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-red-700">Error: {error}</p>
                     <button
@@ -297,7 +273,7 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
 
     return (
         <div className="p-4">
-            <h2 className="text-2xl font-bold mb-4">Performance Table</h2>
+            <h2 className="text-2xl font-bold mb-4">Performance Tables</h2>
 
             {/* Date Filter Controls */}
             <div className="mb-6 p-4 border rounded-lg bg-gray-50">
@@ -311,8 +287,8 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                             onChange={handleDateFilterChange}
                             className="border rounded px-2 py-1"
                         >
-                            <option value="monthly">Monthly</option>
-                            <option value="range">Date Range</option>
+                            <option value="monthly">Monthly (Overall Data)</option>
+                            <option value="range">Date Range (Metrics Data)</option>
                         </select>
                     </div>
 
@@ -375,7 +351,7 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
             </div>
 
             {/* Other Filters and Items Per Page Control */}
-            <div className="flex flex-wrap gap-4 mb-4 items-end">
+            <div className="flex flex-wrap gap-4 mb-6 items-end">
                 <div className="flex flex-col">
                     <label className="text-sm font-medium text-gray-600">Regional</label>
                     <select
@@ -437,130 +413,243 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                 </div>
             </div>
 
-            {/* Show message if no data, but still show filters above */}
-            {!salesData.length && !loading && !error && (
-                <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-yellow-700">No sales data available for the selected date range.</p>
-                    <button
-                        onClick={fetchData}
-                        className="mt-2 px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                    >
-                        Refresh Data
-                    </button>
+            {/* Monthly/Overall Data Table */}
+            {dateFilterType === "monthly" && (
+                <div className="mb-8">
+                    <h3 className="text-xl font-semibold mb-4">Overall Sales Data - {new Date(0, month - 1).toLocaleString('en', { month: 'long' })} {year}</h3>
+
+                    {!salesData.length && !loading && !error ? (
+                        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-yellow-700">No overall sales data available for the selected month.</p>
+                            <button
+                                onClick={fetchData}
+                                className="mt-2 px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                            >
+                                Refresh Data
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Data Summary */}
+                            <div className="mb-4 text-sm text-gray-600">
+                                Showing {salesStartIndex + 1} to {Math.min(salesEndIndex, totalSalesItems)} of {totalSalesItems} entries
+                                {(regionalFilter || branchFilter || wokFilter) && " (filtered)"}
+                            </div>
+
+                            {/* Sales Table */}
+                            <div className="overflow-x-auto border rounded-lg">
+                                <table className="min-w-full text-sm divide-y divide-gray-200">
+                                    <thead className="bg-gray-100 sticky top-0">
+                                        <tr>
+                                            {["Kode SF", "Nama SF", "Total PS", "Category", "Agency", "Area", "Regional", "Branch", "WOK"].map((header) => (
+                                                <th key={header} className="px-3 py-2 text-left font-medium text-gray-700">{header}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {paginatedSalesData.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={9} className="px-3 py-8 text-center text-gray-500">
+                                                    No data found matching the current filters
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            paginatedSalesData.map((row, i) => (
+                                                <tr key={i} className="hover:bg-gray-50 transition">
+                                                    <td className="px-3 py-2">{row.kodeSF}</td>
+                                                    <td className="px-3 py-2">{row.namaSF}</td>
+                                                    <td className="px-3 py-2 font-semibold">{row.totalPs}</td>
+                                                    <td className="px-3 py-2">
+                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${row.category === 'Diamond' ? 'bg-purple-100 text-purple-800' :
+                                                                row.category === 'Platinum' ? 'bg-gray-100 text-gray-800' :
+                                                                    row.category === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
+                                                                        row.category === 'Silver' ? 'bg-gray-200 text-gray-700' :
+                                                                            row.category === 'Bronze' ? 'bg-orange-100 text-orange-800' :
+                                                                                'bg-gray-100 text-gray-600'
+                                                            }`}>
+                                                            {row.category}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2">{row.agency}</td>
+                                                    <td className="px-3 py-2">{row.area}</td>
+                                                    <td className="px-3 py-2">{row.regional}</td>
+                                                    <td className="px-3 py-2">{row.branch}</td>
+                                                    <td className="px-3 py-2">{row.wok}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Sales Pagination */}
+                            {totalSalesPages > 1 && (
+                                <div className="mt-4 flex items-center justify-between">
+                                    <div className="text-sm text-gray-600">
+                                        Page {currentPageSales} of {totalSalesPages}
+                                    </div>
+
+                                    <div className="flex items-center space-x-1">
+                                        <button
+                                            onClick={() => setCurrentPageSales(currentPageSales - 1)}
+                                            disabled={currentPageSales === 1}
+                                            className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                                        >
+                                            Previous
+                                        </button>
+
+                                        {getPageNumbers(currentPageSales, totalSalesPages).map((page, index) => (
+                                            <React.Fragment key={index}>
+                                                {page === '...' ? (
+                                                    <span className="px-3 py-1 text-sm text-gray-500">...</span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => setCurrentPageSales(page as number)}
+                                                        className={`px-3 py-1 text-sm border rounded hover:bg-gray-100 ${currentPageSales === page
+                                                                ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
+                                                                : 'bg-white text-gray-700'
+                                                            }`}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+
+                                        <button
+                                            onClick={() => setCurrentPageSales(currentPageSales + 1)}
+                                            disabled={currentPageSales === totalSalesPages}
+                                            className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
             )}
 
-            {/* Data Summary - only show if we have data */}
-            {salesData.length > 0 && (
-                <div className="mb-4 text-sm text-gray-600">
-                    Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
-                    {(regionalFilter || branchFilter || wokFilter) && " (filtered)"}
-                    {dateFilterType === "monthly"
-                        ? ` • ${new Date(0, month - 1).toLocaleString('en', { month: 'long' })} ${year}`
-                        : (startDate && endDate) ? ` • ${startDate} to ${endDate}` : ""
-                    }
-                </div>
-            )}
+            {/* Date Range/Metrics Data Table */}
+            {dateFilterType === "range" && (
+                <div className="mb-8">
+                    <h3 className="text-xl font-semibold mb-4">Performance Metrics Data - {startDate && endDate ? `${startDate} to ${endDate}` : 'Select Date Range'}</h3>
 
-            {/* Table */}
-            <div className="overflow-x-auto border rounded-lg">
-                <table className="min-w-full text-sm divide-y divide-gray-200">
-                    <thead className="bg-gray-100 sticky top-0">
-                        <tr>
-                            {[
-                                "Kode SF", "Nama SF", "Total PS", "Category", "Agency", "Area", "Regional", "Branch", "Wok",
-                                "WoW", "MoM", "QoQ", "YoY"
-                            ].map((header) => (
-                                <th key={header} className="px-3 py-2 text-left font-medium text-gray-700">{header}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {paginatedData.length === 0 ? (
-                            <tr>
-                                <td colSpan={13} className="px-3 py-8 text-center text-gray-500">
-                                    {salesData.length === 0
-                                        ? "No data available for the selected filters and date range"
-                                        : "No data found matching the current filters"
-                                    }
-                                </td>
-                            </tr>
-                        ) : (
-                            paginatedData.map((row, i) => (
-                                <tr key={i} className="hover:bg-gray-50 transition">
-                                    <td className="px-3 py-2">{row.kodeSF}</td>
-                                    <td className="px-3 py-2">{row.namaSF}</td>
-                                    <td className="px-3 py-2">{row.totalPs}</td>
-                                    <td className="px-3 py-2">{row.category}</td>
-                                    <td className="px-3 py-2">{row.agency}</td>
-                                    <td className="px-3 py-2">{row.area}</td>
-                                    <td className="px-3 py-2">{row.regional}</td>
-                                    <td className="px-3 py-2">{row.branch}</td>
-                                    <td className="px-3 py-2">{row.wok}</td>
-                                    <td className={`px-3 py-2 ${row.WoW.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
-                                        {row.WoW}
-                                    </td>
-                                    <td className={`px-3 py-2 ${row.MoM.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
-                                        {row.MoM}
-                                    </td>
-                                    <td className={`px-3 py-2 ${row.QoQ.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
-                                        {row.QoQ}
-                                    </td>
-                                    <td className={`px-3 py-2 ${row.YoY.includes('-') ? 'text-red-600' : row.YoY === 'N/A' ? 'text-gray-500' : 'text-green-600'}`}>
-                                        {row.YoY}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                    {!metricsData.length && !loading && !error && startDate && endDate ? (
+                        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-yellow-700">No metrics data available for the selected date range.</p>
+                            <button
+                                onClick={fetchData}
+                                className="mt-2 px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                            >
+                                Refresh Data
+                            </button>
+                        </div>
+                    ) : startDate && endDate ? (
+                        <>
+                            {/* Data Summary */}
+                            <div className="mb-4 text-sm text-gray-600">
+                                Showing {metricsStartIndex + 1} to {Math.min(metricsEndIndex, totalMetricsItems)} of {totalMetricsItems} entries
+                                {(regionalFilter || branchFilter || wokFilter) && " (filtered)"}
+                            </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="mt-4 flex items-center justify-between">
-                    <div className="text-sm text-gray-600">
-                        Page {currentPage} of {totalPages}
-                    </div>
+                            {/* Metrics Table */}
+                            <div className="overflow-x-auto border rounded-lg">
+                                <table className="min-w-full text-sm divide-y divide-gray-200">
+                                    <thead className="bg-gray-100 sticky top-0">
+                                        <tr>
+                                            {["Kode SF", "Nama SF", "Agency", "Area", "Regional", "Branch", "WOK", "WoW", "MoM", "QoQ", "YoY"].map((header) => (
+                                                <th key={header} className="px-3 py-2 text-left font-medium text-gray-700">{header}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {paginatedMetricsData.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                                                    No metrics data found matching the current filters
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            paginatedMetricsData.map((row, i) => (
+                                                <tr key={i} className="hover:bg-gray-50 transition">
+                                                    <td className="px-3 py-2">{row.kodeSF}</td>
+                                                    <td className="px-3 py-2">{row.namaSF}</td>
+                                                    <td className="px-3 py-2">{row.agency}</td>
+                                                    <td className="px-3 py-2">{row.area}</td>
+                                                    <td className="px-3 py-2">{row.regional}</td>
+                                                    <td className="px-3 py-2">{row.branch}</td>
+                                                    <td className="px-3 py-2">{row.wok}</td>
+                                                    <td className={`px-3 py-2 font-semibold ${row.WoW?.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
+                                                        {row.WoW}
+                                                    </td>
+                                                    <td className={`px-3 py-2 font-semibold ${row.MoM?.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
+                                                        {row.MoM}
+                                                    </td>
+                                                    <td className={`px-3 py-2 font-semibold ${row.QoQ?.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
+                                                        {row.QoQ}
+                                                    </td>
+                                                    <td className={`px-3 py-2 font-semibold ${row.YoY?.includes('-') ? 'text-red-600' : row.YoY === 'N/A' ? 'text-gray-500' : 'text-green-600'}`}>
+                                                        {row.YoY}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
 
-                    <div className="flex items-center space-x-1">
-                        {/* Previous Button */}
-                        <button
-                            onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                        >
-                            Previous
-                        </button>
+                            {/* Metrics Pagination */}
+                            {totalMetricsPages > 1 && (
+                                <div className="mt-4 flex items-center justify-between">
+                                    <div className="text-sm text-gray-600">
+                                        Page {currentPageMetrics} of {totalMetricsPages}
+                                    </div>
 
-                        {/* Page Numbers */}
-                        {getPageNumbers().map((page, index) => (
-                            <React.Fragment key={index}>
-                                {page === '...' ? (
-                                    <span className="px-3 py-1 text-sm text-gray-500">...</span>
-                                ) : (
-                                    <button
-                                        onClick={() => handlePageChange(page as number)}
-                                        className={`px-3 py-1 text-sm border rounded hover:bg-gray-100 ${currentPage === page
-                                            ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
-                                            : 'bg-white text-gray-700'
-                                            }`}
-                                    >
-                                        {page}
-                                    </button>
-                                )}
-                            </React.Fragment>
-                        ))}
+                                    <div className="flex items-center space-x-1">
+                                        <button
+                                            onClick={() => setCurrentPageMetrics(currentPageMetrics - 1)}
+                                            disabled={currentPageMetrics === 1}
+                                            className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                                        >
+                                            Previous
+                                        </button>
 
-                        {/* Next Button */}
-                        <button
-                            onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                        >
-                            Next
-                        </button>
-                    </div>
+                                        {getPageNumbers(currentPageMetrics, totalMetricsPages).map((page, index) => (
+                                            <React.Fragment key={index}>
+                                                {page === '...' ? (
+                                                    <span className="px-3 py-1 text-sm text-gray-500">...</span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => setCurrentPageMetrics(page as number)}
+                                                        className={`px-3 py-1 text-sm border rounded hover:bg-gray-100 ${currentPageMetrics === page
+                                                                ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
+                                                                : 'bg-white text-gray-700'
+                                                            }`}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+
+                                        <button
+                                            onClick={() => setCurrentPageMetrics(currentPageMetrics + 1)}
+                                            disabled={currentPageMetrics === totalMetricsPages}
+                                            className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-blue-700">Please select both start date and end date to view metrics data.</p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
