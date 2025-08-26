@@ -66,6 +66,8 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                 const salesRes = await fetch(salesUrl);
 
                 if (!salesRes.ok) {
+                    const errorText = await salesRes.text();
+                    console.error("Monthly API Error Response:", errorText);
                     throw new Error(`Monthly API error: ${salesRes.status} ${salesRes.statusText}`);
                 }
 
@@ -74,8 +76,6 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
 
                 const salesData = rawSales.success ? rawSales.data : (Array.isArray(rawSales) ? rawSales : []);
 
-                // For monthly, we only use the sales data from the monthly endpoint
-                // No metrics data needed as it's included in the monthly response
                 setSalesData(salesData || []);
                 setMetricsData([]); // Clear metrics data for monthly view
                 setLoading(false);
@@ -89,7 +89,9 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                 const metricsRes = await fetch(metricsUrl);
 
                 if (!metricsRes.ok) {
-                    throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}`);
+                    const errorText = await metricsRes.text();
+                    console.error("Metrics API Error Response:", errorText);
+                    throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}. Response: ${errorText}`);
                 }
 
                 const rawMetrics = await metricsRes.json();
@@ -97,18 +99,17 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
 
                 const metricsData = rawMetrics.success ? rawMetrics.data : (Array.isArray(rawMetrics) ? rawMetrics : []);
 
-                // For date range, we only use the metrics data
-                // Convert metrics data to sales data format for display
-                const salesDataFromMetrics = (metricsData || []).map((metric: MetricsData) => ({
-                    kodeSF: metric.kodeSF,
-                    namaSF: metric.namaSF,
-                    totalPs: 0, // Not available in metrics endpoint
-                    category: "", // Not available in metrics endpoint
-                    agency: "", // Not available in metrics endpoint
-                    area: "", // Not available in metrics endpoint
-                    regional: "", // Not available in metrics endpoint
-                    branch: "", // Not available in metrics endpoint
-                    wok: "" // Not available in metrics endpoint
+                // For date range, the metrics endpoint contains full sales data + metrics
+                const salesDataFromMetrics = (metricsData || []).map((metric: any) => ({
+                    kodeSF: metric.kodeSF || "",
+                    namaSF: metric.namaSF || "",
+                    totalPs: metric.totalPs || 0, // May not be in metrics endpoint
+                    category: metric.category || "", // May not be in metrics endpoint  
+                    agency: metric.agency || "",
+                    area: metric.area || "",
+                    regional: metric.regional || "",
+                    branch: metric.branch || "",
+                    wok: metric.wok || ""
                 }));
 
                 setSalesData(salesDataFromMetrics);

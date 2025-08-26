@@ -50,36 +50,36 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
-      const [salesRes, metricsRes] = await Promise.all([
+      const [salesRes,] = await Promise.all([
         fetch(`${backendUrl}/api/dashboard/overall`),
-        fetch(`${backendUrl}/api/dashboard/metrics`),
+        // fetch(`${backendUrl}/api/dashboard/metrics`),
       ]);
 
       // Check if responses are OK
       if (!salesRes.ok) {
         throw new Error(`Sales API error: ${salesRes.status} ${salesRes.statusText}`);
       }
-      if (!metricsRes.ok) {
-        throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}`);
-      }
+      // if (!metricsRes.ok) {
+      //   throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}`);
+      // }
 
       const rawSales = await salesRes.json();
-      const rawMetrics = await metricsRes.json();
+      // const rawMetrics = await metricsRes.json();
 
       // Debug: Log the actual API responses
       console.log("Sales API Response:", rawSales);
-      console.log("Metrics API Response:", rawMetrics);
+      // console.log("Metrics API Response:", rawMetrics);
 
       // Extract data based on your backend controller structure
       const salesData = rawSales.success ? rawSales.data : [];
-      const metricsData = rawMetrics.success ? rawMetrics.data : [];
+      // const metricsData = rawMetrics.success ? rawMetrics.data : [];
 
       console.log("Extracted Sales Data:", salesData);
-      console.log("Extracted Metrics Data:", metricsData);
+      // console.log("Extracted Metrics Data:", metricsData);
 
       this.setState({
         salesData: salesData || [],
-        metricsData: metricsData || [],
+        // metricsData: metricsData || [],
         filterOptions: rawSales.filterOptions || {},
         loading: false,
       });
