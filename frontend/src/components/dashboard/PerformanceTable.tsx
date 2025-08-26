@@ -57,43 +57,71 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
         try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
-            let salesUrl: string;
-            let metricsUrl: string;
-
             if (dateFilterType === "monthly") {
-                salesUrl = `${backendUrl}/api/dashboard/overall/monthly?month=${month}&year=${year}`;
-                const startOfMonth = `${year}-${month.toString().padStart(2, '0')}-01`;
-                const endOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
-                metricsUrl = `${backendUrl}/api/dashboard/metrics?startDate=${startOfMonth}&endDate=${endOfMonth}`;
+                // For monthly filter, use the monthly endpoint
+                const salesUrl = `${backendUrl}/api/dashboard/overall/monthly?month=${month}&year=${year}`;
+
+                console.log("Fetching monthly data from:", salesUrl);
+
+                const salesRes = await fetch(salesUrl);
+
+                if (!salesRes.ok) {
+                    throw new Error(`Monthly API error: ${salesRes.status} ${salesRes.statusText}`);
+                }
+
+                const rawSales = await salesRes.json();
+                console.log("Monthly API Response:", rawSales);
+
+                const salesData = rawSales.success ? rawSales.data : (Array.isArray(rawSales) ? rawSales : []);
+
+                // For monthly, we only use the sales data from the monthly endpoint
+                // No metrics data needed as it's included in the monthly response
+                setSalesData(salesData || []);
+                setMetricsData([]); // Clear metrics data for monthly view
+                setLoading(false);
+
+            } else if (dateFilterType === "range" && startDate && endDate) {
+                // For date range filter, use the metrics endpoint
+                const metricsUrl = `${backendUrl}/api/dashboard/metrics?startDate=${startDate}&endDate=${endDate}`;
+
+                console.log("Fetching date range data from:", metricsUrl);
+
+                const metricsRes = await fetch(metricsUrl);
+
+                if (!metricsRes.ok) {
+                    throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}`);
+                }
+
+                const rawMetrics = await metricsRes.json();
+                console.log("Metrics API Response:", rawMetrics);
+
+                const metricsData = rawMetrics.success ? rawMetrics.data : (Array.isArray(rawMetrics) ? rawMetrics : []);
+
+                // For date range, we only use the metrics data
+                // Convert metrics data to sales data format for display
+                const salesDataFromMetrics = (metricsData || []).map((metric: MetricsData) => ({
+                    kodeSF: metric.kodeSF,
+                    namaSF: metric.namaSF,
+                    totalPs: 0, // Not available in metrics endpoint
+                    category: "", // Not available in metrics endpoint
+                    agency: "", // Not available in metrics endpoint
+                    area: "", // Not available in metrics endpoint
+                    regional: "", // Not available in metrics endpoint
+                    branch: "", // Not available in metrics endpoint
+                    wok: "" // Not available in metrics endpoint
+                }));
+
+                setSalesData(salesDataFromMetrics);
+                setMetricsData(metricsData || []);
+                setLoading(false);
+
             } else {
-                salesUrl = `${backendUrl}/api/dashboard/overall`;
-                metricsUrl = `${backendUrl}/api/dashboard/metrics?startDate=${startDate}&endDate=${endDate}`;
+                // If date range is selected but no dates provided, clear data
+                setSalesData([]);
+                setMetricsData([]);
+                setLoading(false);
             }
 
-            const [salesRes, metricsRes] = await Promise.all([
-                fetch(salesUrl),
-                fetch(metricsUrl)
-            ]);
-
-            if (!salesRes.ok) {
-                throw new Error(`Sales API error: ${salesRes.status} ${salesRes.statusText}`);
-            }
-            if (!metricsRes.ok) {
-                throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}`);
-            }
-
-            const rawSales = await salesRes.json();
-            const rawMetrics = await metricsRes.json();
-
-            console.log("Sales API Response:", rawSales);
-            console.log("Metrics API Response:", rawMetrics);
-
-            const salesData = rawSales.success ? rawSales.data : (Array.isArray(rawSales) ? rawSales : []);
-            const metricsData = rawMetrics.success ? rawMetrics.data : (Array.isArray(rawMetrics) ? rawMetrics : []);
-
-            setSalesData(salesData || []);
-            setMetricsData(metricsData || []);
-            setLoading(false);
         } catch (err: any) {
             console.error("Error fetching performance data:", err);
             setError(`Failed to fetch data: ${err.message}`);
@@ -110,26 +138,45 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
         }
     }, [dateFilterType, month, year, startDate, endDate]);
 
-    // Merge sales + metrics with filters
+    // Merge sales + metrics with filters based on dateFilterType
     const filteredData = useMemo(() => {
-        return salesData
-            .filter(
-                (sale) =>
-                    (!regionalFilter || sale.regional === regionalFilter) &&
-                    (!branchFilter || sale.branch === branchFilter) &&
-                    (!wokFilter || sale.wok === wokFilter)
-            )
-            .map((sale) => {
-                const metric = metricsData.find((m) => m.kodeSF === sale.kodeSF);
-                return {
+        if (dateFilterType === "monthly") {
+            // For monthly data, use only the sales data from monthly endpoint
+            return salesData
+                .filter(
+                    (sale) =>
+                        (!regionalFilter || sale.regional === regionalFilter) &&
+                        (!branchFilter || sale.branch === branchFilter) &&
+                        (!wokFilter || sale.wok === wokFilter)
+                )
+                .map((sale) => ({
                     ...sale,
-                    WoW: metric?.WoW || "-",
-                    MoM: metric?.MoM || "-",
-                    QoQ: metric?.QoQ || "-",
-                    YoY: metric?.YoY || "-",
-                };
-            });
-    }, [salesData, metricsData, regionalFilter, branchFilter, wokFilter]);
+                    WoW: "-", // Not available in monthly endpoint
+                    MoM: "-", // Not available in monthly endpoint
+                    QoQ: "-", // Not available in monthly endpoint
+                    YoY: "-"  // Not available in monthly endpoint
+                }));
+        } else {
+            // For date range data, use the metrics data
+            return salesData
+                .filter(
+                    (sale) =>
+                        (!regionalFilter || sale.regional === regionalFilter) &&
+                        (!branchFilter || sale.branch === branchFilter) &&
+                        (!wokFilter || sale.wok === wokFilter)
+                )
+                .map((sale) => {
+                    const metric = metricsData.find((m) => m.kodeSF === sale.kodeSF);
+                    return {
+                        ...sale,
+                        WoW: metric?.WoW || "-",
+                        MoM: metric?.MoM || "-",
+                        QoQ: metric?.QoQ || "-",
+                        YoY: metric?.YoY || "-",
+                    };
+                });
+        }
+    }, [salesData, metricsData, regionalFilter, branchFilter, wokFilter, dateFilterType]);
 
     // Pagination calculations
     const totalItems = filteredData.length;
