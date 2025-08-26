@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, ChangeEvent } from "react";
+import React, { useState, useMemo, ChangeEvent, useEffect } from "react";
 
 type SalesData = {
     kodeSF: string;
@@ -24,20 +24,91 @@ type MetricsData = {
 };
 
 interface PerformanceTableProps {
-    salesData: SalesData[];
-    metricsData: MetricsData[];
-    loading: boolean;
+    loading?: boolean;
 }
 
-export default function PerformanceTable({ salesData, metricsData, loading }: PerformanceTableProps) {
+export default function PerformanceTable({ loading: externalLoading }: PerformanceTableProps) {
+    // Data state
+    const [salesData, setSalesData] = useState<SalesData[]>([]);
+    const [metricsData, setMetricsData] = useState<MetricsData[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
     // Filter hooks
     const [regionalFilter, setRegionalFilter] = useState("");
     const [branchFilter, setBranchFilter] = useState("");
     const [wokFilter, setWokFilter] = useState("");
 
+    // Date filter hooks
+    const [month, setMonth] = useState(new Date().getMonth() + 1);
+    const [year, setYear] = useState(new Date().getFullYear());
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
+    const [dateFilterType, setDateFilterType] = useState<"monthly" | "range">("monthly");
+
     // Pagination hooks
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+
+    // Fetch data function
+    const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+
+            let salesUrl: string;
+            let metricsUrl: string;
+
+            if (dateFilterType === "monthly") {
+                salesUrl = `${backendUrl}/api/dashboard/overall/monthly?month=${month}&year=${year}`;
+                const startOfMonth = `${year}-${month.toString().padStart(2, '0')}-01`;
+                const endOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
+                metricsUrl = `${backendUrl}/api/dashboard/metrics?startDate=${startOfMonth}&endDate=${endOfMonth}`;
+            } else {
+                salesUrl = `${backendUrl}/api/dashboard/overall`;
+                metricsUrl = `${backendUrl}/api/dashboard/metrics?startDate=${startDate}&endDate=${endDate}`;
+            }
+
+            const [salesRes, metricsRes] = await Promise.all([
+                fetch(salesUrl),
+                fetch(metricsUrl)
+            ]);
+
+            if (!salesRes.ok) {
+                throw new Error(`Sales API error: ${salesRes.status} ${salesRes.statusText}`);
+            }
+            if (!metricsRes.ok) {
+                throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}`);
+            }
+
+            const rawSales = await salesRes.json();
+            const rawMetrics = await metricsRes.json();
+
+            console.log("Sales API Response:", rawSales);
+            console.log("Metrics API Response:", rawMetrics);
+
+            const salesData = rawSales.success ? rawSales.data : (Array.isArray(rawSales) ? rawSales : []);
+            const metricsData = rawMetrics.success ? rawMetrics.data : (Array.isArray(rawMetrics) ? rawMetrics : []);
+
+            setSalesData(salesData || []);
+            setMetricsData(metricsData || []);
+            setLoading(false);
+        } catch (err: any) {
+            console.error("Error fetching performance data:", err);
+            setError(`Failed to fetch data: ${err.message}`);
+            setLoading(false);
+        }
+    };
+
+    // Fetch data on component mount and when filters change
+    useEffect(() => {
+        if (dateFilterType === "monthly") {
+            fetchData();
+        } else if (dateFilterType === "range" && startDate && endDate) {
+            fetchData();
+        }
+    }, [dateFilterType, month, year, startDate, endDate]);
 
     // Merge sales + metrics with filters
     const filteredData = useMemo(() => {
@@ -68,9 +139,9 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
     const paginatedData = filteredData.slice(startIndex, endIndex);
 
     // Reset to first page when filters change
-    React.useEffect(() => {
+    useEffect(() => {
         setCurrentPage(1);
-    }, [regionalFilter, branchFilter, wokFilter, itemsPerPage]);
+    }, [regionalFilter, branchFilter, wokFilter, itemsPerPage, dateFilterType, month, year, startDate, endDate]);
 
     const handleFilterChange = (e: ChangeEvent<HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -83,6 +154,21 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
             setWokFilter("");
         } else if (name === "wok") {
             setWokFilter(value);
+        }
+    };
+
+    const handleDateFilterChange = (e: ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+        const { name, value } = e.target;
+        if (name === "dateFilterType") {
+            setDateFilterType(value as "monthly" | "range");
+        } else if (name === "month") {
+            setMonth(Number(value));
+        } else if (name === "year") {
+            setYear(Number(value));
+        } else if (name === "startDate") {
+            setStartDate(value);
+        } else if (name === "endDate") {
+            setEndDate(value);
         }
     };
 
@@ -120,28 +206,127 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
         return rangeWithDots;
     };
 
-    if (loading) return <p>Loading data...</p>;
-    if (!salesData.length) return <p className="text-gray-500">No sales data available.</p>;
+    // Generate filter options
+    const getFilterOptions = () => {
+        const regionalOpts = salesData.length > 0 ? Array.from(new Set(salesData.map((d) => d.regional).filter(Boolean))) : [];
+        const branchOpts = salesData.length > 0 ? Array.from(
+            new Set(salesData.filter((d) => !regionalFilter || d.regional === regionalFilter).map((d) => d.branch).filter(Boolean))
+        ) : [];
+        const wokOpts = salesData.length > 0 ? Array.from(
+            new Set(
+                salesData
+                    .filter((d) => (!regionalFilter || d.regional === regionalFilter) && (!branchFilter || d.branch === branchFilter))
+                    .map((d) => d.wok)
+                    .filter(Boolean)
+            )
+        ) : [];
 
-    // Dynamic filter options
-    const regionalOptions = Array.from(new Set(salesData.map((d) => d.regional).filter(Boolean)));
-    const branchOptions = Array.from(
-        new Set(salesData.filter((d) => !regionalFilter || d.regional === regionalFilter).map((d) => d.branch).filter(Boolean))
-    );
-    const wokOptions = Array.from(
-        new Set(
-            salesData
-                .filter((d) => (!regionalFilter || d.regional === regionalFilter) && (!branchFilter || d.branch === branchFilter))
-                .map((d) => d.wok)
-                .filter(Boolean)
-        )
-    );
+        return { regionalOpts, branchOpts, wokOpts };
+    };
+
+    const { regionalOpts, branchOpts, wokOpts } = getFilterOptions();
+    const currentYear = new Date().getFullYear();
+    const yearOpts = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+
+    if (loading || externalLoading) return <p>Loading data...</p>;
+
+    if (error) {
+        return (
+            <div className="p-4">
+                <h2 className="text-2xl font-bold mb-4">Performance Table</h2>
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-700">Error: {error}</p>
+                    <button
+                        onClick={fetchData}
+                        className="mt-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4">
             <h2 className="text-2xl font-bold mb-4">Performance Table</h2>
 
-            {/* Filters and Items Per Page Control */}
+            {/* Date Filter Controls */}
+            <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+                <h3 className="text-lg font-semibold mb-3">Date Filter</h3>
+                <div className="flex flex-wrap gap-4 items-end">
+                    <div className="flex flex-col">
+                        <label className="text-sm font-medium text-gray-600">Filter Type</label>
+                        <select
+                            name="dateFilterType"
+                            value={dateFilterType}
+                            onChange={handleDateFilterChange}
+                            className="border rounded px-2 py-1"
+                        >
+                            <option value="monthly">Monthly</option>
+                            <option value="range">Date Range</option>
+                        </select>
+                    </div>
+
+                    {dateFilterType === "monthly" ? (
+                        <>
+                            <div className="flex flex-col">
+                                <label className="text-sm font-medium text-gray-600">Month</label>
+                                <select
+                                    name="month"
+                                    value={month}
+                                    onChange={handleDateFilterChange}
+                                    className="border rounded px-2 py-1"
+                                >
+                                    {Array.from({ length: 12 }, (_, i) => (
+                                        <option key={i + 1} value={i + 1}>
+                                            {new Date(0, i).toLocaleString('en', { month: 'long' })}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="text-sm font-medium text-gray-600">Year</label>
+                                <select
+                                    name="year"
+                                    value={year}
+                                    onChange={handleDateFilterChange}
+                                    className="border rounded px-2 py-1"
+                                >
+                                    {yearOpts.map((y) => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex flex-col">
+                                <label className="text-sm font-medium text-gray-600">Start Date</label>
+                                <input
+                                    type="date"
+                                    name="startDate"
+                                    value={startDate}
+                                    onChange={handleDateFilterChange}
+                                    className="border rounded px-2 py-1"
+                                />
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="text-sm font-medium text-gray-600">End Date</label>
+                                <input
+                                    type="date"
+                                    name="endDate"
+                                    value={endDate}
+                                    onChange={handleDateFilterChange}
+                                    className="border rounded px-2 py-1"
+                                />
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Other Filters and Items Per Page Control */}
             <div className="flex flex-wrap gap-4 mb-4 items-end">
                 <div className="flex flex-col">
                     <label className="text-sm font-medium text-gray-600">Regional</label>
@@ -152,7 +337,7 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
                         className="border rounded px-2 py-1"
                     >
                         <option value="">All Regional</option>
-                        {regionalOptions.map((r) => (
+                        {regionalOpts.map((r) => (
                             <option key={r} value={r}>{r}</option>
                         ))}
                     </select>
@@ -167,7 +352,7 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
                         className="border rounded px-2 py-1"
                     >
                         <option value="">All Branches</option>
-                        {branchOptions.map((b) => (
+                        {branchOpts.map((b) => (
                             <option key={b} value={b}>{b}</option>
                         ))}
                     </select>
@@ -182,7 +367,7 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
                         className="border rounded px-2 py-1"
                     >
                         <option value="">All WOK</option>
-                        {wokOptions.map((w) => (
+                        {wokOpts.map((w) => (
                             <option key={w} value={w}>{w}</option>
                         ))}
                     </select>
@@ -204,11 +389,30 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
                 </div>
             </div>
 
-            {/* Data Summary */}
-            <div className="mb-4 text-sm text-gray-600">
-                Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
-                {(regionalFilter || branchFilter || wokFilter) && " (filtered)"}
-            </div>
+            {/* Show message if no data, but still show filters above */}
+            {!salesData.length && !loading && !error && (
+                <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-700">No sales data available for the selected date range.</p>
+                    <button
+                        onClick={fetchData}
+                        className="mt-2 px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                    >
+                        Refresh Data
+                    </button>
+                </div>
+            )}
+
+            {/* Data Summary - only show if we have data */}
+            {salesData.length > 0 && (
+                <div className="mb-4 text-sm text-gray-600">
+                    Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
+                    {(regionalFilter || branchFilter || wokFilter) && " (filtered)"}
+                    {dateFilterType === "monthly"
+                        ? ` • ${new Date(0, month - 1).toLocaleString('en', { month: 'long' })} ${year}`
+                        : (startDate && endDate) ? ` • ${startDate} to ${endDate}` : ""
+                    }
+                </div>
+            )}
 
             {/* Table */}
             <div className="overflow-x-auto border rounded-lg">
@@ -227,7 +431,10 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
                         {paginatedData.length === 0 ? (
                             <tr>
                                 <td colSpan={13} className="px-3 py-8 text-center text-gray-500">
-                                    No data found matching the current filters
+                                    {salesData.length === 0
+                                        ? "No data available for the selected filters and date range"
+                                        : "No data found matching the current filters"
+                                    }
                                 </td>
                             </tr>
                         ) : (
@@ -242,10 +449,18 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
                                     <td className="px-3 py-2">{row.regional}</td>
                                     <td className="px-3 py-2">{row.branch}</td>
                                     <td className="px-3 py-2">{row.wok}</td>
-                                    <td className="px-3 py-2">{row.WoW}</td>
-                                    <td className="px-3 py-2">{row.MoM}</td>
-                                    <td className="px-3 py-2">{row.QoQ}</td>
-                                    <td className="px-3 py-2">{row.YoY}</td>
+                                    <td className={`px-3 py-2 ${row.WoW.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
+                                        {row.WoW}
+                                    </td>
+                                    <td className={`px-3 py-2 ${row.MoM.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
+                                        {row.MoM}
+                                    </td>
+                                    <td className={`px-3 py-2 ${row.QoQ.includes('-') ? 'text-red-600' : 'text-green-600'}`}>
+                                        {row.QoQ}
+                                    </td>
+                                    <td className={`px-3 py-2 ${row.YoY.includes('-') ? 'text-red-600' : row.YoY === 'N/A' ? 'text-gray-500' : 'text-green-600'}`}>
+                                        {row.YoY}
+                                    </td>
                                 </tr>
                             ))
                         )}
@@ -279,8 +494,8 @@ export default function PerformanceTable({ salesData, metricsData, loading }: Pe
                                     <button
                                         onClick={() => handlePageChange(page as number)}
                                         className={`px-3 py-1 text-sm border rounded hover:bg-gray-100 ${currentPage === page
-                                                ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
-                                                : 'bg-white text-gray-700'
+                                            ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
+                                            : 'bg-white text-gray-700'
                                             }`}
                                     >
                                         {page}

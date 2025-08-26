@@ -83,7 +83,7 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
         filterOptions: rawSales.filterOptions || {},
         loading: false,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching dashboard data:", err);
       this.setState({
         error: `Failed to fetch dashboard data: ${err.message}`,
@@ -91,6 +91,7 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
       });
     }
   };
+
   handleUploadSuccess = () => {
     this.fetchData();
   };
@@ -233,34 +234,14 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
               </div>
             )}
 
-            {/* Filter Controls */}
-            <div className="mb-8">
-              <FilterControls
-                filters={filters}
-                filterOptions={filterOptions}
-                onFilterChange={this.updateFilters}
-                onReset={this.resetFilters}
-                loading={loading}
-              />
-            </div>
-
-            {/* Statistics Cards */}
-            <div className="mb-8">
-              <StatisticsCards stats={stats} loading={loading} />
-            </div>
-
             {/* Category Distribution (langsung fetch API) */}
             <div className="mb-8">
               <CategoryDistribution />
             </div>
 
-            {/* Performance Table */}
+            {/* Performance Table - Now manages its own data */}
             <div className="mb-8">
-              <PerformanceTable
-                salesData={salesData}
-                metricsData={metricsData}
-                loading={loading}
-              />
+              <PerformanceTable />
             </div>
 
             {/* Upload Modal */}
