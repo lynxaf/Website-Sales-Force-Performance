@@ -319,18 +319,25 @@ const getSalesforceCategory = (psCount) => {
 
 const getMetrics = async (req, res) => {
   const { startDate, endDate } = req.query;
-  const today = endDate ? new Date(endDate) : new Date();
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      success: false,
+      error: "Missing startDate or endDate query parameter"
+    });
+  }
 
   try {
-    const allSalesData = await SalesPerformance.findAll({ raw: true });
-    
-    // Filter data berdasarkan rentang tanggal yang diberikan
-    const filteredData = allSalesData.filter(d => {
-        const saleDate = new Date(d.tanggalPS);
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        return saleDate >= start && saleDate <= end;
+    const allSalesData = await SalesPerformance.findAll({
+      where: {
+        tanggalPS: {
+          [Op.between]: [startDate, endDate]
+        }
+      },
+      raw: true
     });
+    
+    const filteredData = allSalesData;
 
     const salesDataByCode = filteredData.reduce((acc, sale) => {
       if (!acc[sale.kodeSF]) {
@@ -343,13 +350,20 @@ const getMetrics = async (req, res) => {
     const metricsPerSales = Object.entries(salesDataByCode).map(([kodeSF, data]) => {
       data.sort((a, b) => new Date(a.tanggalPS) - new Date(b.tanggalPS));
 
+      const { agency, area, regional, branch, wok } = data[0];
+
       return {
         namaSF: data[0].namaSF,
         kodeSF: kodeSF,
-        WoW: getWeeklyChange(data, today),
-        MoM: getMonthlyChange(data, today),
-        QoQ: getQuarterlyChange(data, today),
-        YoY: getYearlyChange(data, today),
+        agency: agency,
+        area: area,
+        regional: regional,
+        branch: branch,
+        wok: wok,
+        WoW: getWeeklyChange(data, new Date(endDate)), 
+        MoM: getMonthlyChange(data, new Date(endDate)),
+        QoQ: getQuarterlyChange(data, new Date(endDate)),
+        YoY: getYearlyChange(data, new Date(endDate)),
       };
     });
 
