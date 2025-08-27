@@ -4,8 +4,6 @@ import { Download, Upload, RefreshCw } from 'lucide-react';
 
 // Components
 import { Button } from '../../components/ui/Button';
-import StatisticsCards from "../../components/dashboard/StatisticsCards";
-import { FilterControls } from '../../components/dashboard/FilterControls';
 import CategoryDistribution from "../../components/dashboard/CategoryDistribution";
 import PerformanceTable from '../../components/dashboard/PerformanceTable';
 import { UploadModal } from '../../components/dashboard/UploadModal';
@@ -159,10 +157,6 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
 
   render() {
     const {
-      salesData,
-      metricsData,
-      filterOptions,
-      filters,
       loading,
       error,
       uploadModalOpen,
