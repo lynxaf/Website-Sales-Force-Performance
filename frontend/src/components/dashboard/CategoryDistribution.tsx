@@ -52,7 +52,86 @@ interface State {
     allItems: any[];
     currentPage: number;
     itemsPerPage: number;
+    isProcessingData: boolean;
+    isLoadingTrend: boolean;
 }
+
+// Skeleton Components
+const ChartSkeleton = () => (
+    <div className="h-96 flex-1 relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg p-4 animate-pulse">
+            <div className="flex items-center justify-center h-full">
+                <div className="w-64 h-64 rounded-full bg-gray-300 animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+);
+
+const LineChartSkeleton = () => (
+    <div className="h-96 flex-1 relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg p-4 animate-pulse">
+            <div className="flex items-end justify-between h-full space-x-2 pt-8 pb-12">
+                {[...Array(8)].map((_, i) => (
+                    <div key={i} className="flex-1 bg-gray-300 rounded-t animate-pulse" style={{ height: `${Math.random() * 60 + 20}%` }}></div>
+                ))}
+            </div>
+        </div>
+    </div>
+);
+
+const CategoryListSkeleton = () => (
+    <div className="space-y-3">
+        <div className="h-6 bg-gray-300 rounded animate-pulse mb-6 w-3/4"></div>
+        {[...Array(6)].map((_, i) => (
+            <div key={i} className="p-4 border-l-4 border-gray-200 rounded-r-lg bg-gray-100 animate-pulse">
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-4 h-4 rounded-full bg-gray-300"></div>
+                        <div className="h-4 bg-gray-300 rounded w-20"></div>
+                    </div>
+                    <div className="text-right space-y-1">
+                        <div className="h-5 bg-gray-300 rounded w-12"></div>
+                        <div className="h-3 bg-gray-300 rounded w-16"></div>
+                    </div>
+                </div>
+            </div>
+        ))}
+    </div>
+);
+
+const TableSkeleton = ({ rows = 10 }: { rows?: number }) => (
+    <div className="bg-white rounded-lg shadow-lg border overflow-hidden">
+        <div className="px-6 py-4 bg-gray-50 border-b">
+            <div className="h-6 bg-gray-300 rounded animate-pulse w-1/3 mb-2"></div>
+            <div className="h-4 bg-gray-300 rounded animate-pulse w-1/4"></div>
+        </div>
+
+        <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                    <tr>
+                        {[...Array(9)].map((_, i) => (
+                            <th key={i} className="px-6 py-3">
+                                <div className="h-4 bg-gray-300 rounded animate-pulse"></div>
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                    {[...Array(rows)].map((_, i) => (
+                        <tr key={i}>
+                            {[...Array(9)].map((_, j) => (
+                                <td key={j} className="px-6 py-4">
+                                    <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    </div>
+);
 
 export default class CategoryStats extends React.Component<Props, State> {
     state: State = {
@@ -70,11 +149,15 @@ export default class CategoryStats extends React.Component<Props, State> {
         allItems: [],
         currentPage: 1,
         itemsPerPage: 10,
+        isProcessingData: false,
+        isLoadingTrend: false,
     };
 
     fetchMonthlyTrendData = async () => {
         const { yearFilter, categoryFilter, regionalFilter, branchFilter, wokFilter } = this.state;
         if (!categoryFilter) return;
+
+        this.setState({ isLoadingTrend: true });
 
         try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
@@ -109,9 +192,10 @@ export default class CategoryStats extends React.Component<Props, State> {
                 }
             }
 
-            this.setState({ monthlyTrendData: monthlyData });
+            this.setState({ monthlyTrendData: monthlyData, isLoadingTrend: false });
         } catch (err) {
             console.error("Error fetching monthly trend data:", err);
+            this.setState({ isLoadingTrend: false });
         }
     };
 
@@ -121,13 +205,15 @@ export default class CategoryStats extends React.Component<Props, State> {
 
     fetchData = async () => {
         const { monthFilter, yearFilter } = this.state;
+        this.setState({ loading: true });
+
         const endpoint = this.props.endpoint || `http://localhost:5000/api/dashboard/overall/monthly?month=${monthFilter}&year=${yearFilter}`;
         try {
             const res = await fetch(endpoint);
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
             const items: any[] = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
-            this.setState({ allItems: items, salesData: items });
+            this.setState({ allItems: items, salesData: items, loading: false });
             this.processData(items);
         } catch (err: any) {
             console.error("Error fetching category stats:", err);
@@ -136,43 +222,48 @@ export default class CategoryStats extends React.Component<Props, State> {
     };
 
     processData = (items: any[]) => {
-        const { regionalFilter, branchFilter, wokFilter, categoryFilter } = this.state;
+        this.setState({ isProcessingData: true });
 
-        // Apply all filters including category filter to everything
-        const filteredItems = items.filter((item) => {
-            return (
-                (!regionalFilter || item.regional === regionalFilter) &&
-                (!branchFilter || item.branch === branchFilter) &&
-                (!wokFilter || item.wok === wokFilter) &&
-                (!categoryFilter || item.category === categoryFilter)
-            );
-        });
+        // Add small delay to show skeleton
+        setTimeout(() => {
+            const { regionalFilter, branchFilter, wokFilter, categoryFilter } = this.state;
 
-        // Generate category stats from the filtered data
-        const grouped: Record<string, number> = {};
-        let total = 0;
-        filteredItems.forEach((item) => {
-            const cat = item.category || "Unknown";
-            grouped[cat] = (grouped[cat] || 0) + 1;
-            total++;
-        });
+            // Apply all filters including category filter to everything
+            const filteredItems = items.filter((item) => {
+                return (
+                    (!regionalFilter || item.regional === regionalFilter) &&
+                    (!branchFilter || item.branch === branchFilter) &&
+                    (!wokFilter || item.wok === wokFilter) &&
+                    (!categoryFilter || item.category === categoryFilter)
+                );
+            });
 
-        // Sort categories in desired order
-        const sortOrder = ["Black", "Bronze", "Silver", "Gold", "Platinum", "Diamond"];
-        const stats: CategoryStat[] = Object.entries(grouped)
-            .map(([category, count]) => ({
-                category,
-                count,
-                percentage: total > 0 ? ((count / total) * 100).toFixed(1) : "0",
-            }))
-            .sort((a, b) => sortOrder.indexOf(a.category) - sortOrder.indexOf(b.category));
+            // Generate category stats from the filtered data
+            const grouped: Record<string, number> = {};
+            let total = 0;
+            filteredItems.forEach((item) => {
+                const cat = item.category || "Unknown";
+                grouped[cat] = (grouped[cat] || 0) + 1;
+                total++;
+            });
 
-        this.setState({
-            categoryStats: stats,
-            salesData: filteredItems,
-            loading: false,
-            currentPage: 1 // Reset to first page when filters change
-        });
+            // Sort categories in desired order
+            const sortOrder = ["Black", "Bronze", "Silver", "Gold", "Platinum", "Diamond"];
+            const stats: CategoryStat[] = Object.entries(grouped)
+                .map(([category, count]) => ({
+                    category,
+                    count,
+                    percentage: total > 0 ? ((count / total) * 100).toFixed(1) : "0",
+                }))
+                .sort((a, b) => sortOrder.indexOf(a.category) - sortOrder.indexOf(b.category));
+
+            this.setState({
+                categoryStats: stats,
+                salesData: filteredItems,
+                currentPage: 1,
+                isProcessingData: false
+            });
+        }, 300); // 300ms delay to show skeleton
     };
 
     handleFilterChange = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -316,10 +407,39 @@ export default class CategoryStats extends React.Component<Props, State> {
             monthFilter,
             yearFilter,
             currentPage,
-            itemsPerPage
+            itemsPerPage,
+            isProcessingData,
+            isLoadingTrend
         } = this.state;
 
-        if (loading) return <p>Loading...</p>;
+        if (loading) {
+            return (
+                <div className="space-y-6">
+                    <div className="h-8 bg-gray-300 rounded animate-pulse w-1/3"></div>
+
+                    {/* Filters Skeleton */}
+                    <div className="flex flex-wrap gap-4 mb-6">
+                        {[...Array(7)].map((_, i) => (
+                            <div key={i}>
+                                <div className="h-4 bg-gray-300 rounded animate-pulse w-16 mb-2"></div>
+                                <div className="h-10 bg-gray-200 rounded animate-pulse w-32"></div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Main Content Skeleton */}
+                    <div className="p-6 border rounded-lg shadow-lg bg-white mb-8">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                            <CategoryListSkeleton />
+                            <ChartSkeleton />
+                        </div>
+                    </div>
+
+                    <TableSkeleton />
+                </div>
+            );
+        }
+
         if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
 
         const regionalOptions = Array.from(new Set(allItems.map((i) => i.regional).filter(Boolean)));
@@ -477,7 +597,14 @@ export default class CategoryStats extends React.Component<Props, State> {
                 </div>
 
                 {/* Category Statistics */}
-                {categoryStats.length === 0 ? (
+                {isProcessingData ? (
+                    <div className="p-6 border rounded-lg shadow-lg bg-white mb-8">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                            <CategoryListSkeleton />
+                            <ChartSkeleton />
+                        </div>
+                    </div>
+                ) : categoryStats.length === 0 ? (
                     <p>No category data available</p>
                 ) : (
                     <div className="p-6 border rounded-lg shadow-lg bg-white mb-8">
@@ -580,7 +707,9 @@ export default class CategoryStats extends React.Component<Props, State> {
                                     }
                                 </h3>
 
-                                {categoryFilter && monthlyTrendData.length > 0 ? (
+                                {isLoadingTrend ? (
+                                    <LineChartSkeleton />
+                                ) : categoryFilter && monthlyTrendData.length > 0 ? (
                                     // Show line chart when category is selected
                                     <div className="h-96 flex-1 relative">
                                         <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-emerald-100 rounded-lg p-4">
@@ -716,108 +845,112 @@ export default class CategoryStats extends React.Component<Props, State> {
                 )}
 
                 {/* Sales Data Table */}
-                <div className="bg-white rounded-lg shadow-lg border overflow-hidden">
-                    <div className="px-6 py-4 bg-gray-50 border-b">
-                        <h3 className="text-xl font-bold text-gray-800">
-                            Sales Force Details - {new Date(0, monthFilter - 1).toLocaleString('en', { month: 'long' })} {yearFilter}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                            Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
-                            {(regionalFilter || branchFilter || wokFilter) && " (filtered)"}
-                        </p>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    {["Kode SF", "Nama SF", "Total PS", "Category", "Agency", "Area", "Regional", "Branch", "WOK"].map((header) => (
-                                        <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            {header}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {paginatedData.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
-                                            No data found matching the current filters
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedData.map((row, i) => (
-                                        <tr key={i} className="hover:bg-gray-50 transition-colors duration-150">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.kodeSF}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.namaSF}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">{row.totalPs}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${row.category === 'Diamond' ? 'bg-blue-100 text-blue-800' :
-                                                    row.category === 'Platinum' ? 'bg-gray-100 text-gray-800' :
-                                                        row.category === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
-                                                            row.category === 'Silver' ? 'bg-gray-200 text-gray-700' :
-                                                                row.category === 'Bronze' ? 'bg-orange-100 text-orange-800' :
-                                                                    'bg-black text-white'
-                                                    }`}>
-                                                    {row.category}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-900">{row.agency}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-900">{row.area}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-900">{row.regional}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-900">{row.branch}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-900">{row.wok}</td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
-                            <div className="text-sm text-gray-600">
-                                Page {currentPage} of {totalPages}
-                            </div>
-                            <div className="flex items-center space-x-1">
-                                <button
-                                    onClick={() => this.handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
-                                >
-                                    Previous
-                                </button>
-
-                                {this.getPageNumbers().map((page, index) => (
-                                    <React.Fragment key={index}>
-                                        {page === '...' ? (
-                                            <span className="px-3 py-1 text-sm text-gray-500">...</span>
-                                        ) : (
-                                            <button
-                                                onClick={() => this.handlePageChange(page as number)}
-                                                className={`px-3 py-1 text-sm border rounded transition-colors ${currentPage === page
-                                                    ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
-                                                    : 'bg-white text-gray-700 hover:bg-gray-100'
-                                                    }`}
-                                            >
-                                                {page}
-                                            </button>
-                                        )}
-                                    </React.Fragment>
-                                ))}
-
-                                <button
-                                    onClick={() => this.handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
-                                >
-                                    Next
-                                </button>
-                            </div>
+                {isProcessingData ? (
+                    <TableSkeleton rows={itemsPerPage} />
+                ) : (
+                    <div className="bg-white rounded-lg shadow-lg border overflow-hidden">
+                        <div className="px-6 py-4 bg-gray-50 border-b">
+                            <h3 className="text-xl font-bold text-gray-800">
+                                Sales Force Details - {new Date(0, monthFilter - 1).toLocaleString('en', { month: 'long' })} {yearFilter}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
+                                {(regionalFilter || branchFilter || wokFilter) && " (filtered)"}
+                            </p>
                         </div>
-                    )}
-                </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        {["Kode SF", "Nama SF", "Total PS", "Category", "Agency", "Area", "Regional", "Branch", "WOK"].map((header) => (
+                                            <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                {header}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {paginatedData.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                                                No data found matching the current filters
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginatedData.map((row, i) => (
+                                            <tr key={i} className="hover:bg-gray-50 transition-colors duration-150">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.kodeSF}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.namaSF}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">{row.totalPs}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${row.category === 'Diamond' ? 'bg-blue-100 text-blue-800' :
+                                                        row.category === 'Platinum' ? 'bg-gray-100 text-gray-800' :
+                                                            row.category === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
+                                                                row.category === 'Silver' ? 'bg-gray-200 text-gray-700' :
+                                                                    row.category === 'Bronze' ? 'bg-orange-100 text-orange-800' :
+                                                                        'bg-black text-white'
+                                                        }`}>
+                                                        {row.category}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-900">{row.agency}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-900">{row.area}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-900">{row.regional}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-900">{row.branch}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-900">{row.wok}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
+                                <div className="text-sm text-gray-600">
+                                    Page {currentPage} of {totalPages}
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                    <button
+                                        onClick={() => this.handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                                    >
+                                        Previous
+                                    </button>
+
+                                    {this.getPageNumbers().map((page, index) => (
+                                        <React.Fragment key={index}>
+                                            {page === '...' ? (
+                                                <span className="px-3 py-1 text-sm text-gray-500">...</span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => this.handlePageChange(page as number)}
+                                                    className={`px-3 py-1 text-sm border rounded transition-colors ${currentPage === page
+                                                        ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
+                                                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                                                        }`}
+                                                >
+                                                    {page}
+                                                </button>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+
+                                    <button
+                                        onClick={() => this.handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         );
     }
