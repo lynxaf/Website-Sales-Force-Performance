@@ -120,10 +120,6 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
             setWokFilter("");
         } else if (name === "wok") {
             setWokFilter(value);
-        } else if (name === "agency") {
-            setAgencyFilter(value);
-        } else if (name === "area") {
-            setAreaFilter(value);
         }
     };
 
@@ -209,7 +205,7 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
 
     return (
         <div className="p-4">
-            <h2 className="text-2xl font-bold mb-4">Performance Metrics Dashboard</h2>
+            <h2 className="text-2xl font-bold mb-4">Performance Metrics</h2>
 
             {/* Date Filter Controls */}
             <div className="mb-6 p-4 border rounded-lg bg-gray-50">
@@ -278,7 +274,7 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                     </select>
                 </div>
 
-                <div className="flex flex-col">
+                {/* <div className="flex flex-col">
                     <label className="text-sm font-medium text-gray-600">Agency</label>
                     <select
                         name="agency"
@@ -291,9 +287,9 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                             <option key={a} value={a}>{a}</option>
                         ))}
                     </select>
-                </div>
+                </div> */}
 
-                <div className="flex flex-col">
+                {/* <div className="flex flex-col">
                     <label className="text-sm font-medium text-gray-600">Area</label>
                     <select
                         name="area"
@@ -306,7 +302,7 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                             <option key={a} value={a}>{a}</option>
                         ))}
                     </select>
-                </div>
+                </div> */}
 
                 <div className="flex flex-col">
                     <label className="text-sm font-medium text-gray-600">Items per page</label>
@@ -377,40 +373,40 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                                             <td className="px-6 py-4 text-sm text-gray-900">{row.wok}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 <span className={`font-bold px-2 py-1 rounded ${row.WoW?.includes('-')
-                                                        ? 'bg-red-100 text-red-800'
-                                                        : row.WoW === 'N/A'
-                                                            ? 'bg-gray-100 text-gray-500'
-                                                            : 'bg-green-100 text-green-800'
+                                                    ? 'bg-red-100 text-red-800'
+                                                    : row.WoW === 'N/A'
+                                                        ? 'bg-gray-100 text-gray-500'
+                                                        : 'bg-green-100 text-green-800'
                                                     }`}>
                                                     {row.WoW}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 <span className={`font-bold px-2 py-1 rounded ${row.MoM?.includes('-')
-                                                        ? 'bg-red-100 text-red-800'
-                                                        : row.MoM === 'N/A'
-                                                            ? 'bg-gray-100 text-gray-500'
-                                                            : 'bg-green-100 text-green-800'
+                                                    ? 'bg-red-100 text-red-800'
+                                                    : row.MoM === 'N/A'
+                                                        ? 'bg-gray-100 text-gray-500'
+                                                        : 'bg-green-100 text-green-800'
                                                     }`}>
                                                     {row.MoM}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 <span className={`font-bold px-2 py-1 rounded ${row.QoQ?.includes('-')
-                                                        ? 'bg-red-100 text-red-800'
-                                                        : row.QoQ === 'N/A'
-                                                            ? 'bg-gray-100 text-gray-500'
-                                                            : 'bg-green-100 text-green-800'
+                                                    ? 'bg-red-100 text-red-800'
+                                                    : row.QoQ === 'N/A'
+                                                        ? 'bg-gray-100 text-gray-500'
+                                                        : 'bg-green-100 text-green-800'
                                                     }`}>
                                                     {row.QoQ}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 <span className={`font-bold px-2 py-1 rounded ${row.YoY?.includes('-')
-                                                        ? 'bg-red-100 text-red-800'
-                                                        : row.YoY === 'N/A'
-                                                            ? 'bg-gray-100 text-gray-500'
-                                                            : 'bg-green-100 text-green-800'
+                                                    ? 'bg-red-100 text-red-800'
+                                                    : row.YoY === 'N/A'
+                                                        ? 'bg-gray-100 text-gray-500'
+                                                        : 'bg-green-100 text-green-800'
                                                     }`}>
                                                     {row.YoY}
                                                 </span>
@@ -446,8 +442,8 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                                             <button
                                                 onClick={() => setCurrentPage(page as number)}
                                                 className={`px-3 py-1 text-sm border rounded transition-colors ${currentPage === page
-                                                        ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
-                                                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                                                    ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
+                                                    : 'bg-white text-gray-700 hover:bg-gray-100'
                                                     }`}
                                             >
                                                 {page}

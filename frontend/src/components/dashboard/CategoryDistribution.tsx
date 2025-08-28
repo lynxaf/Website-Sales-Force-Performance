@@ -446,13 +446,12 @@ export default class CategoryStats extends React.Component<Props, State> {
         const branchOptions = Array.from(new Set(allItems.filter((i) => !regionalFilter || i.regional === regionalFilter).map((i) => i.branch).filter(Boolean)));
         const wokOptions = Array.from(new Set(allItems.filter((i) => (!regionalFilter || i.regional === regionalFilter) && (!branchFilter || i.branch === branchFilter)).map((i) => i.wok).filter(Boolean)));
 
-        // Enhanced chart colors with gradients
         const chartColors = [
             "#1a1a1a", // Black - dark elegant
             "#cd7f32", // Bronze - warm bronze
             "#c0c0c0", // Silver - metallic silver
             "#ffd700", // Gold - bright gold
-            "#a49e94ff", // Platinum - sophisticated platinum
+            "#a49e94ff", // Platinum 
             "#b9f2ff"  // Diamond - crystal blue
         ];
 
@@ -535,7 +534,7 @@ export default class CategoryStats extends React.Component<Props, State> {
 
         return (
             <div className="space-y-6">
-                <h2 className="text-2xl font-bold mb-4">Sales Performance Dashboard</h2>
+                <h2 className="text-2xl font-bold mb-4">Sales Category</h2>
 
                 {/* Filters */}
                 <div className="flex flex-wrap gap-4 mb-6">
@@ -592,6 +591,7 @@ export default class CategoryStats extends React.Component<Props, State> {
                             <option value={10}>10</option>
                             <option value={25}>25</option>
                             <option value={50}>50</option>
+                            <option value={100}>100</option>
                         </select>
                     </div>
                 </div>

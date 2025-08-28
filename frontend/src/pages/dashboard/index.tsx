@@ -6,6 +6,7 @@ import { Download, Upload, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import CategoryDistribution from "../../components/dashboard/CategoryDistribution";
 import PerformanceTable from '../../components/dashboard/PerformanceTable';
+import SalesForceProductivity from '../../components/dashboard/SalesProductivity';
 import { UploadModal } from '../../components/dashboard/UploadModal';
 
 // Types
@@ -57,27 +58,19 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
       if (!salesRes.ok) {
         throw new Error(`Sales API error: ${salesRes.status} ${salesRes.statusText}`);
       }
-      // if (!metricsRes.ok) {
-      //   throw new Error(`Metrics API error: ${metricsRes.status} ${metricsRes.statusText}`);
-      // }
 
       const rawSales = await salesRes.json();
-      // const rawMetrics = await metricsRes.json();
 
       // Debug: Log the actual API responses
       console.log("Sales API Response:", rawSales);
-      // console.log("Metrics API Response:", rawMetrics);
 
       // Extract data based on your backend controller structure
       const salesData = rawSales.success ? rawSales.data : [];
-      // const metricsData = rawMetrics.success ? rawMetrics.data : [];
 
       console.log("Extracted Sales Data:", salesData);
-      // console.log("Extracted Metrics Data:", metricsData);
 
       this.setState({
         salesData: salesData || [],
-        // metricsData: metricsData || [],
         filterOptions: rawSales.filterOptions || {},
         loading: false,
       });
@@ -97,7 +90,8 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
   handleExport = async () => {
     this.setState({ exporting: true, exportError: null });
     try {
-      const res = await fetch("http://localhost:5000/api/dashboard/export", {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+      const res = await fetch(`${backendUrl}/api/dashboard/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(this.state.filters),
@@ -164,6 +158,7 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
     } = this.state;
 
     const stats = this.calculateStats();
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
     return (
       <>
@@ -228,12 +223,19 @@ export default class DashboardPage extends React.Component<{}, DashboardPageStat
               </div>
             )}
 
-            {/* Category Distribution (langsung fetch API) */}
+            {/* Sales Force Productivity Section */}
+            <div className="mb-8">
+              <SalesForceProductivity
+                endpoint={`${backendUrl}/api/dashboard/overall/monthly`}
+              />
+            </div>
+
+            {/* Category Distribution */}
             <div className="mb-8">
               <CategoryDistribution />
             </div>
 
-            {/* Performance Table - Now manages its own data */}
+            {/* Performance Table */}
             <div className="mb-8">
               <PerformanceTable />
             </div>
