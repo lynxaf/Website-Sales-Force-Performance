@@ -12,6 +12,7 @@ import {
     PointElement,
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, ChartDataLabels, LineElement, PointElement);
 
@@ -37,6 +38,11 @@ interface Props {
     endpoint?: string;
 }
 
+interface SortState {
+    field: string;
+    direction: 'asc' | 'desc';
+}
+
 interface State {
     categoryStats: CategoryStat[];
     salesData: SalesData[];
@@ -54,6 +60,7 @@ interface State {
     itemsPerPage: number;
     isProcessingData: boolean;
     isLoadingTrend: boolean;
+    sortConfig: SortState;
 }
 
 // Skeleton Components
@@ -151,6 +158,10 @@ export default class CategoryStats extends React.Component<Props, State> {
         itemsPerPage: 10,
         isProcessingData: false,
         isLoadingTrend: false,
+        sortConfig: {
+            field: 'totalPs',
+            direction: 'desc'
+        }
     };
 
     fetchMonthlyTrendData = async () => {
@@ -221,15 +232,38 @@ export default class CategoryStats extends React.Component<Props, State> {
         }
     };
 
+    // Sorting functionality
+    handleSort = (field: string): void => {
+        this.setState(prev => ({
+            sortConfig: {
+                field,
+                direction: prev.sortConfig.field === field && prev.sortConfig.direction === 'desc' ? 'asc' : 'desc'
+            },
+            currentPage: 1 // Reset to first page when sorting changes
+        }), () => {
+            this.processData(this.state.allItems);
+        });
+    };
+
+    getSortIcon = (field: string) => {
+        const { sortConfig } = this.state;
+        if (sortConfig.field !== field) {
+            return <ChevronUp className="w-4 h-4 text-gray-300" />;
+        }
+        return sortConfig.direction === 'asc'
+            ? <ChevronUp className="w-4 h-4 text-blue-600" />
+            : <ChevronDown className="w-4 h-4 text-blue-600" />;
+    };
+
     processData = (items: any[]) => {
         this.setState({ isProcessingData: true });
 
         // Add small delay to show skeleton
         setTimeout(() => {
-            const { regionalFilter, branchFilter, wokFilter, categoryFilter } = this.state;
+            const { regionalFilter, branchFilter, wokFilter, categoryFilter, sortConfig } = this.state;
 
             // Apply all filters including category filter to everything
-            const filteredItems = items.filter((item) => {
+            let filteredItems = items.filter((item) => {
                 return (
                     (!regionalFilter || item.regional === regionalFilter) &&
                     (!branchFilter || item.branch === branchFilter) &&
@@ -238,10 +272,43 @@ export default class CategoryStats extends React.Component<Props, State> {
                 );
             });
 
-            // Generate category stats from the filtered data
+            // Apply sorting
+            filteredItems = [...filteredItems].sort((a, b) => {
+                const aValue = a[sortConfig.field as keyof SalesData];
+                const bValue = b[sortConfig.field as keyof SalesData];
+
+                if (aValue == null && bValue == null) return 0;
+                if (aValue == null) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (bValue == null) return sortConfig.direction === 'asc' ? 1 : -1;
+
+                if (typeof aValue === 'string' && typeof bValue === 'string') {
+                    return sortConfig.direction === 'asc'
+                        ? aValue.localeCompare(bValue)
+                        : bValue.localeCompare(aValue);
+                }
+
+                if (typeof aValue === 'number' && typeof bValue === 'number') {
+                    return sortConfig.direction === 'asc'
+                        ? aValue - bValue
+                        : bValue - aValue;
+                }
+
+                return 0;
+            });
+
+            // Generate category stats from the filtered data (before sorting for stats calculation)
+            const statsItems = items.filter((item) => {
+                return (
+                    (!regionalFilter || item.regional === regionalFilter) &&
+                    (!branchFilter || item.branch === branchFilter) &&
+                    (!wokFilter || item.wok === wokFilter) &&
+                    (!categoryFilter || item.category === categoryFilter)
+                );
+            });
+
             const grouped: Record<string, number> = {};
             let total = 0;
-            filteredItems.forEach((item) => {
+            statsItems.forEach((item) => {
                 const cat = item.category || "Unknown";
                 grouped[cat] = (grouped[cat] || 0) + 1;
                 total++;
@@ -259,7 +326,7 @@ export default class CategoryStats extends React.Component<Props, State> {
 
             this.setState({
                 categoryStats: stats,
-                salesData: filteredItems,
+                salesData: filteredItems, // Use sorted data
                 currentPage: 1,
                 isProcessingData: false
             });
@@ -409,7 +476,8 @@ export default class CategoryStats extends React.Component<Props, State> {
             currentPage,
             itemsPerPage,
             isProcessingData,
-            isLoadingTrend
+            isLoadingTrend,
+            sortConfig
         } = this.state;
 
         if (loading) {
@@ -524,6 +592,19 @@ export default class CategoryStats extends React.Component<Props, State> {
                 },
             },
         };
+
+        // Column definitions for easier management
+        const columns = [
+            { field: 'kodeSF', header: 'Kode SF', sortable: true },
+            { field: 'namaSF', header: 'Nama SF', sortable: true },
+            { field: 'totalPs', header: 'Total PS', sortable: true },
+            { field: 'category', header: 'Category', sortable: true },
+            { field: 'agency', header: 'Agency', sortable: true },
+            { field: 'area', header: 'Area', sortable: true },
+            { field: 'regional', header: 'Regional', sortable: true },
+            { field: 'branch', header: 'Branch', sortable: true },
+            { field: 'wok', header: 'WOK', sortable: true },
+        ];
 
         // Pagination calculations
         const totalItems = salesData.length;
@@ -857,15 +938,28 @@ export default class CategoryStats extends React.Component<Props, State> {
                                 Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} entries
                                 {(regionalFilter || branchFilter || wokFilter) && " (filtered)"}
                             </p>
+                            {sortConfig.field && (
+                                <p className="text-xs text-blue-600 mt-1">
+                                    Sorted by {columns.find(col => col.field === sortConfig.field)?.header || sortConfig.field} ({sortConfig.direction === 'asc' ? 'ascending' : 'descending'})
+                                </p>
+                            )}
                         </div>
 
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        {["Kode SF", "Nama SF", "Total PS", "Category", "Agency", "Area", "Regional", "Branch", "WOK"].map((header) => (
-                                            <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                {header}
+                                        {columns.map((column) => (
+                                            <th
+                                                key={column.field}
+                                                className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.sortable ? 'cursor-pointer hover:bg-gray-100 select-none' : ''
+                                                    }`}
+                                                onClick={column.sortable ? () => this.handleSort(column.field) : undefined}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    {column.header}
+                                                    {column.sortable && this.getSortIcon(column.field)}
+                                                </div>
                                             </th>
                                         ))}
                                     </tr>

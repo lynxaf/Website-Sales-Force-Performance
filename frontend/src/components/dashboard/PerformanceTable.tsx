@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, ChangeEvent, useEffect } from "react";
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 type MetricsData = {
     namaSF: string;
@@ -18,6 +19,11 @@ type MetricsData = {
 
 interface PerformanceTableProps {
     loading?: boolean;
+}
+
+interface SortState {
+    field: string;
+    direction: 'asc' | 'desc';
 }
 
 export default function PerformanceTable({ loading: externalLoading }: PerformanceTableProps) {
@@ -39,6 +45,12 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
     // Pagination hooks
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+
+    // Sorting hooks
+    const [sortConfig, setSortConfig] = useState<SortState>({
+        field: 'namaSF',
+        direction: 'asc'
+    });
 
     // Fetch data function
     const fetchData = async () => {
@@ -85,9 +97,36 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
         fetchData();
     }, [endDate]);
 
-    // Filter metrics data
-    const filteredMetricsData = useMemo(() => {
-        return metricsData.filter(
+    // Sorting function
+    const handleSort = (field: string): void => {
+        setSortConfig(prev => ({
+            field,
+            direction: prev.field === field && prev.direction === 'desc' ? 'asc' : 'desc'
+        }));
+        // Reset to first page when sorting changes
+        setCurrentPage(1);
+    };
+
+    const getSortIcon = (field: string) => {
+        if (sortConfig.field !== field) {
+            return <ChevronUp className="w-4 h-4 text-gray-300" />;
+        }
+        return sortConfig.direction === 'asc'
+            ? <ChevronUp className="w-4 h-4 text-blue-600" />
+            : <ChevronDown className="w-4 h-4 text-blue-600" />;
+    };
+
+    // Helper function to convert percentage string to number for sorting
+    const parsePercentage = (value: string): number => {
+        if (value === 'N/A' || !value) return -999999; // Put N/A at the end
+        const numValue = parseFloat(value.replace('%', ''));
+        return isNaN(numValue) ? -999999 : numValue;
+    };
+
+    // Filter and sort metrics data
+    const processedMetricsData = useMemo(() => {
+        // First apply filters
+        const filtered = metricsData.filter(
             (metric) =>
                 (!regionalFilter || metric.regional === regionalFilter) &&
                 (!branchFilter || metric.branch === branchFilter) &&
@@ -95,14 +134,37 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                 (!agencyFilter || metric.agency === agencyFilter) &&
                 (!areaFilter || metric.area === areaFilter)
         );
-    }, [metricsData, regionalFilter, branchFilter, wokFilter, agencyFilter, areaFilter]);
+
+        // Then apply sorting
+        const sorted = [...filtered].sort((a, b) => {
+            const aValue = a[sortConfig.field as keyof MetricsData];
+            const bValue = b[sortConfig.field as keyof MetricsData];
+
+            // Handle percentage fields specially
+            if (['WoW', 'MoM', 'QoQ', 'YoY'].includes(sortConfig.field)) {
+                const aNum = parsePercentage(aValue);
+                const bNum = parsePercentage(bValue);
+                return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
+            }
+
+            // Handle regular string fields
+            if (typeof aValue === 'string' && typeof bValue === 'string') {
+                const comparison = aValue.localeCompare(bValue);
+                return sortConfig.direction === 'asc' ? comparison : -comparison;
+            }
+
+            return 0;
+        });
+
+        return sorted;
+    }, [metricsData, regionalFilter, branchFilter, wokFilter, agencyFilter, areaFilter, sortConfig]);
 
     // Pagination for metrics data
-    const totalMetricsItems = filteredMetricsData.length;
+    const totalMetricsItems = processedMetricsData.length;
     const totalMetricsPages = Math.ceil(totalMetricsItems / itemsPerPage);
     const metricsStartIndex = (currentPage - 1) * itemsPerPage;
     const metricsEndIndex = metricsStartIndex + itemsPerPage;
-    const paginatedMetricsData = filteredMetricsData.slice(metricsStartIndex, metricsEndIndex);
+    const paginatedMetricsData = processedMetricsData.slice(metricsStartIndex, metricsEndIndex);
 
     // Reset pagination when filters change
     useEffect(() => {
@@ -183,6 +245,21 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
     };
 
     const { regionalOpts, branchOpts, wokOpts, agencyOpts, areaOpts } = getFilterOptions();
+
+    // Column definitions for easier management
+    const columns = [
+        { field: 'kodeSF', header: 'Kode SF', sortable: true },
+        { field: 'namaSF', header: 'Nama SF', sortable: true },
+        { field: 'agency', header: 'Agency', sortable: true },
+        { field: 'area', header: 'Area', sortable: true },
+        { field: 'regional', header: 'Regional', sortable: true },
+        { field: 'branch', header: 'Branch', sortable: true },
+        { field: 'wok', header: 'WOK', sortable: true },
+        { field: 'WoW', header: 'WoW (%)', sortable: true },
+        { field: 'MoM', header: 'MoM (%)', sortable: true },
+        { field: 'QoQ', header: 'QoQ (%)', sortable: true },
+        { field: 'YoY', header: 'YoY (%)', sortable: true },
+    ];
 
     if (loading || externalLoading) return <p>Loading data...</p>;
 
@@ -274,36 +351,6 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                     </select>
                 </div>
 
-                {/* <div className="flex flex-col">
-                    <label className="text-sm font-medium text-gray-600">Agency</label>
-                    <select
-                        name="agency"
-                        value={agencyFilter}
-                        onChange={handleFilterChange}
-                        className="border rounded px-3 py-2"
-                    >
-                        <option value="">All Agencies</option>
-                        {agencyOpts.map((a) => (
-                            <option key={a} value={a}>{a}</option>
-                        ))}
-                    </select>
-                </div> */}
-
-                {/* <div className="flex flex-col">
-                    <label className="text-sm font-medium text-gray-600">Area</label>
-                    <select
-                        name="area"
-                        value={areaFilter}
-                        onChange={handleFilterChange}
-                        className="border rounded px-3 py-2"
-                    >
-                        <option value="">All Areas</option>
-                        {areaOpts.map((a) => (
-                            <option key={a} value={a}>{a}</option>
-                        ))}
-                    </select>
-                </div> */}
-
                 <div className="flex flex-col">
                     <label className="text-sm font-medium text-gray-600">Items per page</label>
                     <select
@@ -341,15 +388,28 @@ export default function PerformanceTable({ loading: externalLoading }: Performan
                             Showing {metricsStartIndex + 1} to {Math.min(metricsEndIndex, totalMetricsItems)} of {totalMetricsItems} entries
                             {(regionalFilter || branchFilter || wokFilter || agencyFilter || areaFilter) && " (filtered)"}
                         </p>
+                        {sortConfig.field && (
+                            <p className="text-xs text-blue-600 mt-1">
+                                Sorted by {columns.find(col => col.field === sortConfig.field)?.header || sortConfig.field} ({sortConfig.direction === 'asc' ? 'ascending' : 'descending'})
+                            </p>
+                        )}
                     </div>
 
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    {["Kode SF", "Nama SF", "Agency", "Area", "Regional", "Branch", "WOK", "WoW (%)", "MoM (%)", "QoQ (%)", "YoY (%)"].map((header) => (
-                                        <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            {header}
+                                    {columns.map((column) => (
+                                        <th
+                                            key={column.field}
+                                            className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.sortable ? 'cursor-pointer hover:bg-gray-100 select-none' : ''
+                                                }`}
+                                            onClick={column.sortable ? () => handleSort(column.field) : undefined}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                {column.header}
+                                                {column.sortable && getSortIcon(column.field)}
+                                            </div>
                                         </th>
                                     ))}
                                 </tr>
